@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { allFonts } from "@/lib/fonts";
 
 const BASE =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://baseline-type.vercel.app";
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://baseline-wheat.vercel.app";
 
 /**
  * One entry per font family — ~1,900 pages, which is the entire point of the

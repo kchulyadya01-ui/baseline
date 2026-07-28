@@ -14,7 +14,7 @@ const mono = JetBrains_Mono({ variable: "--font-mono-ui", subsets: ["latin"] });
 
 export const metadata: Metadata = {
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? "https://baseline-type.vercel.app",
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://baseline-wheat.vercel.app",
   ),
   title: {
     default: "Baseline — typography and colour tools for designers",
