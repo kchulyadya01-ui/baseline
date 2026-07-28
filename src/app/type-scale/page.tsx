@@ -1,0 +1,82 @@
+import type { Metadata } from "next";
+import {
+  TypeScaleStudio,
+  type FontOption,
+} from "@/components/studio/type-scale-studio";
+import { getFont, queryFonts } from "@/lib/fonts";
+
+export const metadata: Metadata = {
+  title: "Type Scale Studio — modular scale generator with CSS export",
+  description:
+    "Build a modular type scale from a base size and ratio. Live preview in any Google Font, suggested line heights and tracking, export to CSS variables, Tailwind v4 or design tokens.",
+  alternates: { canonical: "/type-scale" },
+};
+
+export default async function TypeScalePage(props: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await props.searchParams;
+  const requested = Array.isArray(params.font) ? params.font[0] : params.font;
+
+  // The picker only needs a workable shortlist, not all 1,900 families.
+  const shortlist = queryFonts({ sort: "popular", perPage: 120 }).fonts;
+  const preselected = requested ? getFont(requested) : undefined;
+
+  const options: FontOption[] = [
+    ...(preselected ? [preselected] : []),
+    ...shortlist.filter((f) => f.slug !== preselected?.slug),
+  ].map((f) => ({ slug: f.slug, family: f.family, category: f.category }));
+
+  return (
+    <div className="mx-auto max-w-[76rem] px-5">
+      <header className="pt-12 pb-8">
+        <span className="label-mono">02 · Type Scale Studio</span>
+        <h1 className="mt-3 max-w-3xl font-display text-4xl font-semibold tracking-tight">
+          One ratio, every size, and the CSS to go with it
+        </h1>
+        <p className="mt-4 max-w-2xl text-base text-fg-muted">
+          Pick a base size and a ratio; the scale falls out of the maths. Line
+          height and tracking are suggested per step — tight for display sizes,
+          open for body copy — and the export is ready to paste.
+        </p>
+      </header>
+
+      <TypeScaleStudio
+        fonts={options}
+        initialFont={
+          preselected
+            ? {
+                slug: preselected.slug,
+                family: preselected.family,
+                category: preselected.category,
+              }
+            : undefined
+        }
+      />
+
+      <section className="mt-16 grid gap-6 border-t border-line pt-10 sm:grid-cols-3">
+        {[
+          {
+            title: "Why a ratio at all",
+            body: "Sizes chosen one at a time drift. A ratio makes every step a deliberate multiple of the last, so headings relate to body copy instead of merely being bigger than it.",
+          },
+          {
+            title: "Line height moves with size",
+            body: "Long body lines need air; a 60px headline does not. The suggested line height falls as size rises, from roughly 1.6 at 16px to near 1.05 at display sizes.",
+          },
+          {
+            title: "Tracking is optical",
+            body: "Large type looks loose at default spacing, small type looks cramped. Negative tracking above 24px and a touch of positive below 14px fixes both.",
+          },
+        ].map((item) => (
+          <div key={item.title}>
+            <h2 className="font-display text-base font-semibold">{item.title}</h2>
+            <p className="mt-2 text-sm leading-relaxed text-fg-muted">
+              {item.body}
+            </p>
+          </div>
+        ))}
+      </section>
+    </div>
+  );
+}

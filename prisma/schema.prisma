@@ -1,0 +1,383 @@
+// Baseline — Phase 2 data model.
+//
+// DORMANT. Nothing in the running app reads this yet: Phase 1 ships from a
+// build-time JSON snapshot of the catalogue and keeps studio state in the URL
+// and in local component state, so the deployed product needs no database.
+//
+// It lives here now because the shape is the one architectural decision that is
+// expensive to change later, and it should be settled before the Kit is built.
+//
+// THE RULE: Kit is the aggregate root. Every child carries kitId. That single
+// constraint is what makes "change a colour -> revalidate every contrast pair"
+// one transactional query instead of cross-service orchestration. Do not
+// compromise it.
+//
+// To activate:
+//   1. provision Postgres with pgvector  (Neon, Supabase or self-hosted)
+//   2. set DATABASE_URL
+//   3. npx prisma migrate dev --name init
+//   4. enable the extension: CREATE EXTENSION IF NOT EXISTS vector;
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+// Prisma 7 moved the connection URL out of the schema; see prisma.config.ts.
+datasource db {
+  provider   = "postgresql"
+  extensions = [vector]
+}
+
+// --- accounts ------------------------------------------------------------
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  imageUrl  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  kits Kit[]
+
+  @@map("users")
+}
+
+// --- catalogue -----------------------------------------------------------
+// Mirrors src/data/fonts.json. Ingestion writes here once the DB is live;
+// the JSON snapshot becomes a build-time cache of this table.
+
+model License {
+  id                String  @id // "OFL-1.1", "Apache-2.0", "UFL-1.0"
+  name              String
+  url               String
+  redistributable   Boolean @default(true)
+  commercialUse     Boolean @default(true)
+  embedding         Boolean @default(true)
+  modification      Boolean @default(true)
+  sellingFontItself Boolean @default(false)
+
+  fonts Font[]
+
+  @@map("licenses")
+}
+
+model Font {
+  id           String   @id @default(cuid())
+  slug         String   @unique
+  family       String   @unique
+  category     String
+  designers    String[]
+  subsets      String[]
+  weights      Int[]
+  hasItalic    Boolean  @default(false)
+  isVariable   Boolean  @default(false)
+  popularity   Int
+  sizeBytes    Int
+  dateAdded    DateTime
+  lastModified DateTime
+
+  // Provenance. The licence claim has to be traceable to a source, or the
+  // ">99% licence accuracy" requirement is just a hope.
+  sourceRepo  String @default("github.com/google/fonts")
+  sourcePath  String // e.g. "ofl/inter"
+  licenseFile String
+
+  // Commercial faces are indexed as metadata + buy link ONLY. There is
+  // deliberately no file column on this model: the legal guardrail is in the
+  // schema, not in a code path someone can forget.
+  isCommercial Boolean @default(false)
+  purchaseUrl  String?
+
+  licenseId String
+  license   License @relation(fields: [licenseId], references: [id])
+
+  variants FontVariant[]
+  kitFonts KitFont[]
+  axes     FontAxis[]
+
+  @@index([category, popularity])
+  @@index([popularity])
+  @@map("fonts")
+}
+
+model FontAxis {
+  id           String @id @default(cuid())
+  tag          String // wght, wdth, opsz, slnt …
+  min          Float
+  max          Float
+  defaultValue Float
+
+  fontId String
+  font   Font   @relation(fields: [fontId], references: [id], onDelete: Cascade)
+
+  @@unique([fontId, tag])
+  @@map("font_axes")
+}
+
+model FontVariant {
+  id       String  @id @default(cuid())
+  weight   Int
+  style    String  @default("normal") // normal | italic
+  fileUrl  String? // our own CDN, OFL only — never set for commercial fonts
+  fileSize Int?
+
+  fontId String
+  font   Font   @relation(fields: [fontId], references: [id], onDelete: Cascade)
+
+  embedding GlyphEmbedding?
+
+  @@unique([fontId, weight, style])
+  @@map("font_variants")
+}
+
+// Phase 3: image-mode identification. 512-dim glyph embedding per variant,
+// searched with pgvector cosine distance in the same store as everything else.
+model GlyphEmbedding {
+  id        String                      @id @default(cuid())
+  vector    Unsupported("vector(512)")?
+  modelName String
+  createdAt DateTime                    @default(now())
+
+  variantId String      @unique
+  variant   FontVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@map("glyph_embeddings")
+}
+
+// --- the Kit -------------------------------------------------------------
+
+model Kit {
+  id        String   @id @default(cuid())
+  name      String
+  brief     String?
+  slug      String   @unique
+  isPublic  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  fonts    KitFont[]
+  scales   TypeScale[]
+  palettes Palette[]
+  boards   Board[]
+  versions KitVersion[]
+  exports  ExportJob[]
+
+  @@index([ownerId, updatedAt])
+  @@map("kits")
+}
+
+model KitFont {
+  id        String   @id @default(cuid())
+  role      String // display | heading | body | mono | accent
+  weights   Int[]
+  notes     String?
+  createdAt DateTime @default(now())
+
+  kitId  String
+  kit    Kit    @relation(fields: [kitId], references: [id], onDelete: Cascade)
+  fontId String
+  font   Font   @relation(fields: [fontId], references: [id])
+
+  @@unique([kitId, role])
+  @@index([kitId])
+  @@map("kit_fonts")
+}
+
+model TypeScale {
+  id         String @id @default(cuid())
+  name       String @default("Default")
+  baseSize   Float  @default(16)
+  ratio      Float  @default(1.25)
+  stepsUp    Int    @default(5)
+  stepsDown  Int    @default(2)
+  rounding   Float  @default(1)
+
+  kitId String
+  kit   Kit    @relation(fields: [kitId], references: [id], onDelete: Cascade)
+
+  steps ScaleStep[]
+
+  @@index([kitId])
+  @@map("type_scales")
+}
+
+// Steps are materialised rather than recomputed on read: a step can be
+// overridden by hand, and an export has to be reproducible from the record.
+model ScaleStep {
+  id            String @id @default(cuid())
+  step          Int
+  name          String
+  px            Float
+  lineHeight    Float
+  letterSpacing Float  @default(0)
+
+  kitId   String // denormalised: every child carries kitId
+  scaleId String
+  scale   TypeScale @relation(fields: [scaleId], references: [id], onDelete: Cascade)
+
+  @@unique([scaleId, step])
+  @@index([kitId])
+  @@map("scale_steps")
+}
+
+model Palette {
+  id      String @id @default(cuid())
+  name    String @default("Default")
+  harmony String @default("monochrome")
+
+  kitId String
+  kit   Kit    @relation(fields: [kitId], references: [id], onDelete: Cascade)
+
+  swatches Swatch[]
+
+  @@index([kitId])
+  @@map("palettes")
+}
+
+model Swatch {
+  id     String  @id @default(cuid())
+  role   String // primary | secondary | accent | neutral | surface | …
+  hex    String
+  // OKLCH stored alongside hex: the ramp maths works in OKLCH, and round-tripping
+  // through hex loses precision on every edit.
+  l      Float
+  c      Float
+  h      Float
+  locked Boolean @default(false)
+
+  kitId     String
+  paletteId String
+  palette   Palette @relation(fields: [paletteId], references: [id], onDelete: Cascade)
+
+  asForeground ContrastPair[] @relation("foreground")
+  asBackground ContrastPair[] @relation("background")
+
+  @@unique([paletteId, role])
+  @@index([kitId])
+  @@map("swatches")
+}
+
+// Materialised so a failing pair can be listed, sorted and gated on without
+// recomputing the whole palette. This is the table the "change a colour ->
+// revalidate every pair" query rewrites, in one transaction.
+model ContrastPair {
+  id        String   @id @default(cuid())
+  ratio     Float
+  passesAA  Boolean
+  passesAAA Boolean
+  level     String // AAA | AA | AA Large | Fail
+  checkedAt DateTime @default(now())
+
+  kitId String
+
+  foregroundId String
+  foreground   Swatch @relation("foreground", fields: [foregroundId], references: [id], onDelete: Cascade)
+  backgroundId String
+  background   Swatch @relation("background", fields: [backgroundId], references: [id], onDelete: Cascade)
+
+  @@unique([foregroundId, backgroundId])
+  @@index([kitId, passesAA])
+  @@map("contrast_pairs")
+}
+
+model Board {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  kitId String
+  kit   Kit    @relation(fields: [kitId], references: [id], onDelete: Cascade)
+
+  items BoardItem[]
+
+  @@index([kitId])
+  @@map("boards")
+}
+
+model BoardItem {
+  id        String   @id @default(cuid())
+  sourceUrl String?
+  imageUrl  String
+  caption   String?
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  kitId   String
+  boardId String
+  board   Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  meta ExtractedMeta?
+
+  @@index([kitId])
+  @@map("board_items")
+}
+
+model ExtractedMeta {
+  id            String   @id @default(cuid())
+  dominantHexes String[]
+  detectedFonts String[]
+  extractedAt   DateTime @default(now())
+
+  kitId  String
+  itemId String    @unique
+  item   BoardItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([kitId])
+  @@map("extracted_meta")
+}
+
+// Immutable snapshots. The whole Kit graph is serialised into `snapshot` so a
+// version can be restored even after a font is delisted upstream.
+model KitVersion {
+  id        String   @id @default(cuid())
+  version   Int
+  label     String?
+  snapshot  Json
+  createdAt DateTime @default(now())
+
+  kitId String
+  kit   Kit    @relation(fields: [kitId], references: [id], onDelete: Cascade)
+
+  @@unique([kitId, version])
+  @@index([kitId, createdAt])
+  @@map("kit_versions")
+}
+
+// --- async ---------------------------------------------------------------
+
+model ExportJob {
+  id          String    @id @default(cuid())
+  format      String // css | tailwind | tokens | pdf | zip
+  status      String    @default("queued") // queued | running | done | failed
+  artefactUrl String?
+  error       String?
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  kitId String
+  kit   Kit    @relation(fields: [kitId], references: [id], onDelete: Cascade)
+
+  @@index([kitId, createdAt])
+  @@map("export_jobs")
+}
+
+// Uploaded identification images. Purged after 30 days unless saved to a Kit —
+// a GDPR requirement, enforced by a scheduled job reading expiresAt.
+model IdentifyRequest {
+  id         String    @id @default(cuid())
+  mode       String // url | image
+  inputUrl   String?
+  imageUrl   String?
+  results    Json
+  savedToKit Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime?
+
+  @@index([expiresAt])
+  @@map("identify_requests")
+}
