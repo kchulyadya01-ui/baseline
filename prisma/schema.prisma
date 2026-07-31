@@ -1,47 +1,117 @@
-// Baseline — Phase 2 data model.
+// Baseline — data model.
 //
-// DORMANT. Nothing in the running app reads this yet: Phase 1 ships from a
-// build-time JSON snapshot of the catalogue and keeps studio state in the URL
-// and in local component state, so the deployed product needs no database.
+// LIVE for the Community section (accounts, projects, collections, messaging).
+// DORMANT for the Kit (Phase 2): those models are written and migrated, but no
+// code reads them yet — the studios still keep their state in the URL and in
+// component state.
 //
-// It lives here now because the shape is the one architectural decision that is
-// expensive to change later, and it should be settled before the Kit is built.
+// THE RULE for the Kit: it is the aggregate root, and every child carries
+// kitId. That single constraint is what makes "change a colour -> revalidate
+// every contrast pair" one transactional query instead of cross-service
+// orchestration. Do not compromise it.
 //
-// THE RULE: Kit is the aggregate root. Every child carries kitId. That single
-// constraint is what makes "change a colour -> revalidate every contrast pair"
-// one transactional query instead of cross-service orchestration. Do not
-// compromise it.
-//
-// To activate:
-//   1. provision Postgres with pgvector  (Neon, Supabase or self-hosted)
+// Setup:
+//   1. provision Postgres  (Neon)
 //   2. set DATABASE_URL
-//   3. npx prisma migrate dev --name init
-//   4. enable the extension: CREATE EXTENSION IF NOT EXISTS vector;
+//   3. npx prisma migrate deploy
 
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["postgresqlExtensions"]
+  provider = "prisma-client-js"
 }
 
 // Prisma 7 moved the connection URL out of the schema; see prisma.config.ts.
 datasource db {
-  provider   = "postgresql"
-  extensions = [vector]
+  provider = "postgresql"
 }
 
 // --- accounts ------------------------------------------------------------
+// Auth.js (NextAuth v5) owns User, Account, Session and VerificationToken.
+// Field names in those four are fixed by the adapter — do not rename them.
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  imageUrl  String?
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+
+  // Profile. The handle is the public identity: /u/[handle]
+  //
+  // Nullable because Auth.js inserts the row before the person has chosen one.
+  // A null handle means "not onboarded": requireOnboarded() in src/lib/auth.ts
+  // redirects to /welcome, and nothing that writes will run without it.
+  handle    String?  @unique
+  bio       String?  @db.VarChar(280)
+  website   String?
+  location  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  kits Kit[]
+  // Set when a moderator suspends the account. Suspended users can read but
+  // cannot post, save, follow or message.
+  suspendedAt     DateTime?
+  suspendedReason String?
 
+  accounts Account[]
+  sessions Session[]
+
+  kits          Kit[]
+  projects      Project[]
+  collections   Collection[]
+  likes         Like[]
+  saves         Save[]
+  following     Follow[]              @relation("follower")
+  followers     Follow[]              @relation("following")
+  participantIn ConversationMember[]
+  messagesSent  Message[]
+  blocksMade    Block[]               @relation("blocker")
+  blocksAgainst Block[]               @relation("blocked")
+  reportsMade   Report[]              @relation("reporter")
+
+  @@index([handle])
   @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
 }
 
 // --- catalogue -----------------------------------------------------------
@@ -126,25 +196,15 @@ model FontVariant {
   fontId String
   font   Font   @relation(fields: [fontId], references: [id], onDelete: Cascade)
 
-  embedding GlyphEmbedding?
-
   @@unique([fontId, weight, style])
   @@map("font_variants")
 }
 
-// Phase 3: image-mode identification. 512-dim glyph embedding per variant,
-// searched with pgvector cosine distance in the same store as everything else.
-model GlyphEmbedding {
-  id        String                      @id @default(cuid())
-  vector    Unsupported("vector(512)")?
-  modelName String
-  createdAt DateTime                    @default(now())
-
-  variantId String      @unique
-  variant   FontVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
-
-  @@map("glyph_embeddings")
-}
+// Phase 3 will add a GlyphEmbedding model here — a 512-dim vector per variant,
+// searched with pgvector cosine distance for image-mode identification. It is
+// left out until then rather than migrated early: it needs the pgvector
+// extension enabled on the database, and nothing should be installed on a
+// production instance months before the first query that uses it.
 
 // --- the Kit -------------------------------------------------------------
 
@@ -380,4 +440,335 @@ model IdentifyRequest {
 
   @@index([expiresAt])
   @@map("identify_requests")
+}
+
+// =========================================================================
+// COMMUNITY
+//
+// Post a project, save other people's work into collections, follow the
+// creators, message them. The social layer sits alongside the tools rather
+// than inside them: a Project references the fonts and colours it used, which
+// is what makes the feed useful to a designer rather than just pretty.
+// =========================================================================
+
+model Project {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String   @db.VarChar(120)
+  description String?  @db.VarChar(2000)
+  // Free-text credit for work the poster did not make themselves. Posting
+  // someone else's work is allowed; claiming it is not.
+  sourceUrl   String?
+  sourceCredit String? @db.VarChar(200)
+
+  // Denormalised counters. Feed sorting reads these on every row; counting
+  // likes across a join per row is the query that kills a feed at scale.
+  likeCount Int @default(0)
+  saveCount Int @default(0)
+  viewCount Int @default(0)
+
+  status      ProjectStatus @default(PUBLISHED)
+  publishedAt DateTime      @default(now())
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  images   ProjectImage[]
+  fonts    ProjectFont[]
+  colours  ProjectColour[]
+  tags     ProjectTag[]
+  likes    Like[]
+  saves    Save[]
+  reports  Report[]
+
+  @@index([status, publishedAt])
+  @@index([authorId, publishedAt])
+  @@index([likeCount])
+  @@map("projects")
+}
+
+enum ProjectStatus {
+  DRAFT
+  PUBLISHED
+  // Hidden by a moderator. Kept rather than deleted so a report has something
+  // to point at and an appeal has something to restore.
+  REMOVED
+}
+
+model ProjectImage {
+  id       String  @id @default(cuid())
+  url      String
+  // Vercel Blob pathname. Needed to delete the object when the row goes.
+  blobPath String
+  alt      String? @db.VarChar(200)
+  width    Int
+  height   Int
+  bytes    Int
+  position Int     @default(0)
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, position])
+  @@map("project_images")
+}
+
+// The bridge back to the tools: "set in Fraunces and Inter" is a link, not a
+// caption. A font here may not exist in the catalogue (commercial faces), so
+// this stores the name and an optional slug rather than a foreign key.
+model ProjectFont {
+  id       String  @id @default(cuid())
+  family   String
+  fontSlug String?
+  role     String? // display | heading | body | mono
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([fontSlug])
+  @@map("project_fonts")
+}
+
+model ProjectColour {
+  id       String @id @default(cuid())
+  hex      String @db.VarChar(9)
+  position Int    @default(0)
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("project_colours")
+}
+
+model Tag {
+  id    String @id @default(cuid())
+  slug  String @unique
+  label String
+
+  projects ProjectTag[]
+
+  @@map("tags")
+}
+
+model ProjectTag {
+  projectId String
+  tagId     String
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, tagId])
+  @@index([tagId])
+  @@map("project_tags")
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userId    String
+  projectId String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, projectId])
+  @@index([projectId])
+  @@map("likes")
+}
+
+// --- collections ---------------------------------------------------------
+
+model Collection {
+  id          String   @id @default(cuid())
+  name        String   @db.VarChar(80)
+  slug        String
+  description String?  @db.VarChar(500)
+  isPrivate   Boolean  @default(false)
+  itemCount   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  saves Save[]
+
+  @@unique([ownerId, slug])
+  @@index([ownerId, updatedAt])
+  @@map("collections")
+}
+
+// A save is the join between a project and a collection. Uniqueness is on
+// (collection, project) rather than (user, project): the same project can sit
+// in two different boards, which is the whole point of boards.
+model Save {
+  id        String   @id @default(cuid())
+  note      String?  @db.VarChar(500)
+  createdAt DateTime @default(now())
+
+  userId       String
+  projectId    String
+  collectionId String
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project    Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@unique([collectionId, projectId])
+  @@index([userId, createdAt])
+  @@index([projectId])
+  @@map("saves")
+}
+
+// --- social graph --------------------------------------------------------
+
+model Follow {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  followerId  String
+  followingId String
+
+  follower  User @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followingId])
+  @@map("follows")
+}
+
+// --- messaging -----------------------------------------------------------
+//
+// Modelled as conversations with members rather than a flat sender/recipient
+// pair. One-to-one is all the UI exposes today, but a group thread is the
+// obvious next ask and retrofitting it onto a two-column table means a data
+// migration on live message history.
+
+model Conversation {
+  id            String   @id @default(cuid())
+  // Denormalised for the inbox list: ordering threads by their newest message
+  // otherwise needs a correlated subquery per row.
+  lastMessageAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  members  ConversationMember[]
+  messages Message[]
+
+  @@index([lastMessageAt])
+  @@map("conversations")
+}
+
+model ConversationMember {
+  id       String    @id @default(cuid())
+  // Per-member read state, so "3 unread" is a comparison, not a scan.
+  lastReadAt DateTime?
+  // Leaving hides the thread for one member without destroying it for the other.
+  leftAt     DateTime?
+
+  conversationId String
+  userId         String
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+  @@map("conversation_members")
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  body      String   @db.VarChar(4000)
+  createdAt DateTime @default(now())
+  // Soft delete: the row stays so the thread keeps its shape.
+  deletedAt DateTime?
+
+  conversationId String
+  senderId       String
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  reports Report[]
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+// --- moderation ----------------------------------------------------------
+//
+// Blocks and reports exist from the first commit, not after the first
+// incident. A public site with direct messaging needs both before it has
+// users, because the day you need them is the day it is too late to build them.
+
+model Block {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  blockerId String
+  blockedId String
+
+  blocker User @relation("blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+  @@map("blocks")
+}
+
+model Report {
+  id         String       @id @default(cuid())
+  reason     ReportReason
+  detail     String?      @db.VarChar(1000)
+  status     ReportStatus @default(OPEN)
+  createdAt  DateTime     @default(now())
+  resolvedAt DateTime?
+  resolution String?
+
+  reporterId String
+  reporter   User   @relation("reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  // Exactly one target is set. Not split into separate tables because the
+  // moderation queue reads all reports in one ordered list.
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  messageId String?
+  message   Message? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String?
+
+  @@index([status, createdAt])
+  @@index([projectId])
+  @@map("reports")
+}
+
+enum ReportReason {
+  SPAM
+  HARASSMENT
+  STOLEN_WORK
+  SEXUAL_CONTENT
+  VIOLENCE
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  ACTIONED
+  DISMISSED
+}
+
+// Abuse limiting for anything that writes on behalf of an anonymous or new
+// account: uploads, messages, reports. Keyed by action + subject (user id or
+// IP hash) with a rolling window.
+model RateLimit {
+  id         String   @id @default(cuid())
+  key        String   @unique
+  count      Int      @default(0)
+  windowEnds DateTime
+
+  @@index([windowEnds])
+  @@map("rate_limits")
 }

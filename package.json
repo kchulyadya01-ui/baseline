@@ -10,17 +10,25 @@
     "ingest": "tsx scripts/ingest-fonts.ts"
   },
   "dependencies": {
+    "@auth/prisma-adapter": "^2.11.3",
+    "@prisma/adapter-pg": "^7.9.1",
+    "@prisma/client": "^7.9.1",
+    "@vercel/blob": "^2.6.1",
     "cheerio": "^1.2.0",
     "culori": "^4.0.2",
     "next": "16.2.12",
+    "next-auth": "^5.0.0-beta.32",
+    "pg": "^8.22.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/culori": "^4.0.1",
     "@types/node": "^20",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
