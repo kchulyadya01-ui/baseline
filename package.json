@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "ingest": "tsx scripts/ingest-fonts.ts"
+    "ingest": "tsx scripts/ingest-fonts.ts",
+    "smoke": "tsx scripts/smoke-community.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",

@@ -10,6 +10,7 @@ Six documents. Together they answer *why*, *what the experience is*, *how the ma
 | [04 — Technical requirements](./04-trd.md) | Stack, data model, API surface, non-functional targets |
 | [05 — System architecture](./05-architecture.md) | How the running pieces connect |
 | [06 — Who owns what](./06-ownership.md) | The engineering / design split |
+| [07 — The community section](./07-community.md) | Post, save, collections, messaging — and the moderation model |
 
 > **PRD = why · IA + Flows = the experience · TRD + Architecture = the machine · Roadmap = the order.**
 

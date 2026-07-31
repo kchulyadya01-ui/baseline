@@ -13,6 +13,25 @@ Four public tools, built from the [build packet](./docs) in `docs/`:
 
 Plus ~1,900 programmatic SEO pages at `/fonts/[slug]` — the acquisition channel.
 
+### And a community
+
+| Route | What it does |
+| --- | --- |
+| `/community` | Feed of posted work — recent, popular, or from people you follow |
+| `/community/[slug]` | A project: images, the fonts and colours behind it, like, save, message the creator |
+| `/submit` | Post a project — drag images in, tag the fonts and palette used |
+| `/u/[handle]` | Profile, projects and public collections |
+| `/collections` | Your saved boards, public or private |
+| `/messages` | Threaded inbox |
+
+Every project lists the fonts and colours it used, and those link back into the
+library and the studios — which is what makes a feed post useful to a designer
+rather than just pretty.
+
+**The tools work without any of it.** The community needs a database and a blob
+store; if neither is configured those routes explain themselves instead of
+erroring, and nothing else on the site notices.
+
 ---
 
 ## Stack
@@ -24,9 +43,11 @@ Plus ~1,900 programmatic SEO pages at `/fonts/[slug]` — the acquisition channe
 | Colour | [culori](https://culorijs.org) — OKLCH + WCAG 2.1 | Contrast is a fixed formula, not a model |
 | Catalogue | Build-time JSON snapshot of `google/fonts` | Zero-dependency deploy; ~2k rows scan in well under the 400ms budget |
 | Font ID | Static CSS read (cheerio) on a Node route | Deterministic, and no browser binary in a serverless function |
-| Phase 2 | Postgres + pgvector via Prisma — **dormant** | Schema settled early, deliberately not wired up |
+| Community DB | Postgres (Neon) via Prisma 7 + `pg` adapter | Created lazily, so the tools still build with no database |
+| Auth | Auth.js v5, database sessions | A suspended account must lose access now; a 30-day JWT cannot be revoked |
+| Uploads | Vercel Blob, client-direct | Bytes go browser → store; the route only issues a scoped token |
 
-**No database, no environment variables and no external services are required to run or deploy this.** That is deliberate: Phase 1 is the free wedge, and it should cost nothing to keep online.
+**The tools need no database, no environment variables and no external services.** That is deliberate: they are the free wedge and should cost nothing to keep online. The community section is the only part that needs infrastructure, and it degrades to an explanation when that infrastructure is absent.
 
 ---
 
