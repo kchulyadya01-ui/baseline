@@ -30,6 +30,7 @@ const eslintConfig = defineConfig([
       "src/app/u/**/*.tsx",
       "src/app/collections/**/*.tsx",
       "src/app/messages/**/*.tsx",
+      "src/components/identify/**/*.tsx",
     ],
     rules: {
       "@next/next/no-img-element": "off",

@@ -16,12 +16,14 @@
 //   3. npx prisma migrate deploy
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 // Prisma 7 moved the connection URL out of the schema; see prisma.config.ts.
 datasource db {
-  provider = "postgresql"
+  provider   = "postgresql"
+  extensions = [vector]
 }
 
 // --- accounts ------------------------------------------------------------
@@ -203,11 +205,42 @@ model FontVariant {
   @@map("font_variants")
 }
 
-// Phase 3 will add a GlyphEmbedding model here — a 512-dim vector per variant,
-// searched with pgvector cosine distance for image-mode identification. It is
-// left out until then rather than migrated early: it needs the pgvector
-// extension enabled on the database, and nothing should be installed on a
-// production instance months before the first query that uses it.
+/// Image-mode font identification.
+///
+/// One descriptor per family, built by rendering the family's own outlines —
+/// see scripts/index-glyphs.ts. The vector is a concatenation of eight key
+/// glyphs rasterised to a 14x14 grid (8 * 196 = 1568 dims), each normalised to
+/// its own bounding box so the comparison is about letterform shape rather
+/// than point size.
+///
+/// Deliberately not a neural embedding: the same eight glyphs rendered the same
+/// way produce the same vector every time, which means a match is reproducible
+/// and explainable. A model would add a dependency, a service and a training
+/// story for a problem that is fundamentally about shape.
+model FontDescriptor {
+  id       String @id @default(cuid())
+  fontSlug String @unique
+  family   String
+  category String
+
+  /// 1568-dim raster descriptor. Unsupported because Prisma has no vector type;
+  /// reads and writes go through raw SQL in src/lib/glyph-search.ts.
+  descriptor Unsupported("vector(1568)")
+
+  /// Coarse metrics kept alongside for filtering and for explaining a match in
+  /// words rather than only as a distance.
+  xHeightRatio  Float
+  widthRatio    Float
+  strokeWeight  Float
+  strokeContrast Float
+  hasSerifs     Boolean
+
+  sourceUrl String
+  indexedAt DateTime @default(now())
+
+  @@index([category])
+  @@map("font_descriptors")
+}
 
 // --- the Kit -------------------------------------------------------------
 

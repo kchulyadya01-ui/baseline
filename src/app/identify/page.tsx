@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { IdentifyForm } from "@/components/identify/identify-form";
+import { ImageIdentify } from "@/components/identify/image-identify";
+import { isCommunityConfigured } from "@/lib/db";
 
 export const metadata: Metadata = {
   title: "Font Identifier — find the fonts on any web page",
@@ -8,7 +11,14 @@ export const metadata: Metadata = {
   alternates: { canonical: "/identify" },
 };
 
-export default function IdentifyPage() {
+export const dynamic = "force-dynamic";
+
+export default async function IdentifyPage(props: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await props.searchParams;
+  const mode = params.mode === "image" ? "image" : "url";
+  const imageAvailable = isCommunityConfigured();
   return (
     <div className="mx-auto max-w-[52rem] px-5">
       <header className="pt-12 pb-8">
@@ -24,7 +34,39 @@ export default function IdentifyPage() {
         </p>
       </header>
 
-      <IdentifyForm />
+      <nav className="mb-6 flex gap-1">
+        {(
+          [
+            ["url", "From a URL"],
+            ["image", "From a screenshot"],
+          ] as const
+        ).map(([key, label]) => (
+          <Link
+            key={key}
+            href={key === "url" ? "/identify" : "/identify?mode=image"}
+            className={
+              mode === key
+                ? "rounded-control bg-bg-inset px-3 py-1.5 text-sm font-medium text-fg"
+                : "rounded-control px-3 py-1.5 text-sm text-fg-muted hover:bg-bg-sunken hover:text-fg"
+            }
+          >
+            {label}
+          </Link>
+        ))}
+      </nav>
+
+      {mode === "image" ? (
+        imageAvailable ? (
+          <ImageIdentify />
+        ) : (
+          <p className="rounded-card border border-line bg-bg-sunken p-4 text-sm text-fg-muted">
+            Screenshot identification needs the glyph index, which lives in the
+            database. URL identification works without one.
+          </p>
+        )
+      ) : (
+        <IdentifyForm />
+      )}
 
       <section className="mt-16 border-t border-line pt-10">
         <h2 className="label-mono mb-5">How this works</h2>
@@ -47,8 +89,8 @@ export default function IdentifyPage() {
             },
             {
               step: "04",
-              title: "The limit",
-              body: "This is a static read of HTML and linked CSS, so styles injected by JavaScript after load are invisible to it. Image-based identification — matching glyph shapes from a screenshot — is a Phase 3 feature.",
+              title: "From a screenshot instead",
+              body: "If you only have an image, the screenshot reader segments the letterforms and matches their shapes against every family in the catalogue. It is a shortlist rather than an answer — shape matching is strong on structure and weak on fine detail — so use the URL reader whenever you have the page.",
             },
           ].map((item) => (
             <li key={item.step} className="flex gap-4">
