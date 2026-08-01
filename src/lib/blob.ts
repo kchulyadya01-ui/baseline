@@ -1,32 +1,18 @@
 import "server-only";
 
 /**
- * Whether Vercel Blob is usable in this environment.
+ * Whether a Vercel Blob store is attached.
  *
- * There are two ways the SDK authenticates, and only checking for the first
- * one is wrong:
+ * Deliberately only checks that a store exists, not that credentials resolve.
+ * The SDK authenticates two different ways — a classic `BLOB_READ_WRITE_TOKEN`,
+ * or the platform's OIDC token together with `BLOB_STORE_ID` — and how the
+ * second one is plumbed through at runtime is the SDK's business, not ours.
  *
- *   1. `BLOB_READ_WRITE_TOKEN` — the classic long-lived token.
- *   2. Vercel OIDC + `BLOB_STORE_ID` — what a store attached through the
- *      dashboard gets today. No read-write token is ever created, and the SDK
- *      documents the token as "ignored when Vercel OIDC token is available and
- *      either process.env.BLOB_STORE_ID or options.storeId is set".
- *
- * `VERCEL_OIDC_TOKEN` is injected by the platform at runtime and is also
- * written into .env.local by `vercel link`, so local development against the
- * real store works too.
- */
-export function isBlobConfigured(): boolean {
-  if (process.env.BLOB_READ_WRITE_TOKEN) return true;
-  return Boolean(process.env.BLOB_STORE_ID && process.env.VERCEL_OIDC_TOKEN);
-}
-
-/**
- * True when a store is attached at all, OIDC token or not.
- *
- * Used for cleanup paths (deleting blobs behind a deleted project) where it is
- * worth attempting the call and tolerating a failure, rather than skipping it
- * and orphaning files.
+ * An earlier version of this required `VERCEL_OIDC_TOKEN` to be visible as an
+ * env var and refused every upload on a correctly configured store because it
+ * was not. Guessing at someone else's credential resolution is how that
+ * happens; the SDK's own error is the honest answer, so failures now surface
+ * from `handleUpload` rather than from a guess made before it.
  */
 export function hasBlobStore(): boolean {
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
