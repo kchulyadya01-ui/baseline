@@ -7,6 +7,7 @@ import {
   LikeButton,
   MessageButton,
   ReportMenu,
+  RepostButton,
   SaveButton,
 } from "@/components/community/interactions";
 import { CommunityNotConfigured } from "@/components/community/not-configured";
@@ -127,12 +128,28 @@ export default async function ProjectPage(props: {
               initialLiked={state.liked}
               initialCount={project.likeCount}
             />
+            {!state.isAuthor ? (
+              <RepostButton
+                projectId={project.id}
+                initialReposted={state.reposted}
+                initialCount={project.repostCount}
+              />
+            ) : null}
             <SaveButton
               projectId={project.id}
               collections={collections}
               initialSavedIn={state.savedIn}
             />
-            {!state.isAuthor ? <MessageButton userId={project.authorId} /> : null}
+            {state.isAuthor ? (
+              <Link
+                href={`/community/${project.slug}/edit`}
+                className="inline-flex h-10 items-center rounded-control border border-line-strong px-4 text-sm text-fg-muted transition-colors hover:text-fg"
+              >
+                Edit
+              </Link>
+            ) : (
+              <MessageButton userId={project.authorId} />
+            )}
           </div>
         </div>
       </header>
@@ -198,6 +215,39 @@ export default async function ProjectPage(props: {
         </div>
 
         <aside className="space-y-6">
+          {project.credits.length ? (
+            <section className="rounded-card border border-line bg-bg-raised p-5">
+              <h2 className="label-mono mb-3">Also on this</h2>
+              <ul className="space-y-3">
+                {project.credits.map((credit) => (
+                  <li key={credit.id}>
+                    <Link
+                      href={`/u/${credit.user.handle}`}
+                      className="flex items-center gap-2.5 group"
+                    >
+                      <Avatar
+                        name={credit.user.name}
+                        handle={credit.user.handle}
+                        image={credit.user.image}
+                        size="sm"
+                      />
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm text-fg group-hover:underline">
+                          {credit.user.name ?? `@${credit.user.handle}`}
+                        </span>
+                        {credit.role ? (
+                          <span className="block truncate text-2xs text-fg-subtle">
+                            {credit.role}
+                          </span>
+                        ) : null}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
           {project.fonts.length ? (
             <section className="rounded-card border border-line bg-bg-raised p-5">
               <h2 className="label-mono mb-3">Type</h2>

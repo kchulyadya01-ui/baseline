@@ -60,6 +60,8 @@ model User {
   collections   Collection[]
   likes         Like[]
   saves         Save[]
+  reposts       Repost[]
+  creditedOn    ProjectCredit[]
   following     Follow[]              @relation("follower")
   followers     Follow[]              @relation("following")
   participantIn ConversationMember[]
@@ -465,6 +467,7 @@ model Project {
   // likes across a join per row is the query that kills a feed at scale.
   likeCount Int @default(0)
   saveCount Int @default(0)
+  repostCount Int @default(0)
   viewCount Int @default(0)
 
   status      ProjectStatus @default(PUBLISHED)
@@ -481,6 +484,8 @@ model Project {
   tags     ProjectTag[]
   likes    Like[]
   saves    Save[]
+  reposts  Repost[]
+  credits  ProjectCredit[]
   reports  Report[]
 
   @@index([status, publishedAt])
@@ -566,6 +571,30 @@ model ProjectTag {
   @@map("project_tags")
 }
 
+/// People tagged on a project — collaborators, clients, the photographer.
+///
+/// A credit points at a real account rather than storing a free-text name, so
+/// it links to their profile and surfaces the work on it. `role` stays free
+/// text because the list of things people do on a project has no useful end
+/// (art direction, retouching, copy, print production...).
+///
+/// Being tagged is not the same as authorship: the author is still the single
+/// `authorId` on Project, and only they can edit or delete it.
+model ProjectCredit {
+  id        String   @id @default(cuid())
+  role      String?  @db.VarChar(60)
+  createdAt DateTime @default(now())
+
+  projectId String
+  userId    String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId, createdAt])
+  @@map("project_credits")
+}
+
 model Like {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
@@ -578,6 +607,28 @@ model Like {
   @@unique([userId, projectId])
   @@index([projectId])
   @@map("likes")
+}
+
+/// A repost is an endorsement, not a copy: it points at the original project
+/// and never duplicates its images or its author. Deleting the original takes
+/// every repost of it with it, so a repost can never outlive the work it
+/// points at and become a dead card in someone's profile.
+model Repost {
+  id        String   @id @default(cuid())
+  /// Optional quote, in the style of a quote-retweet. Kept short on purpose:
+  /// this is a note about someone else's work, not a post of your own.
+  comment   String?  @db.VarChar(280)
+  createdAt DateTime @default(now())
+
+  userId    String
+  projectId String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, projectId])
+  @@index([projectId])
+  @@index([userId, createdAt])
+  @@map("reposts")
 }
 
 // --- collections ---------------------------------------------------------

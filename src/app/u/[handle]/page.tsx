@@ -9,9 +9,16 @@ import {
 } from "@/components/community/interactions";
 import { CommunityNotConfigured } from "@/components/community/not-configured";
 import { ProjectGrid } from "@/components/community/project-card";
+import { RepostCard } from "@/components/community/repost-card";
 import { ButtonLink } from "@/components/ui/button";
 import { auth } from "@/lib/auth";
-import { getCollections, getProfile, getUserProjects } from "@/lib/community";
+import {
+  getCollections,
+  getProfile,
+  getUserCredits,
+  getUserProjects,
+  getUserReposts,
+} from "@/lib/community";
 import { db, isCommunityConfigured } from "@/lib/db";
 import { formatDate, pluralise } from "@/lib/utils";
 
@@ -35,10 +42,12 @@ export async function generateMetadata(props: {
 
 export default async function ProfilePage(props: {
   params: Promise<{ handle: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   if (!isCommunityConfigured()) return <CommunityNotConfigured />;
 
   const { handle } = await props.params;
+  const params = await props.searchParams;
   const session = await auth();
   const viewerId = session?.user?.id ?? null;
 
@@ -47,8 +56,10 @@ export default async function ProfilePage(props: {
 
   const isSelf = viewerId === user.id;
 
-  const [projects, collections, follow] = await Promise.all([
+  const [projects, reposts, taggedIn, collections, follow] = await Promise.all([
     getUserProjects(user.id, viewerId),
+    getUserReposts(user.id, viewerId),
+    getUserCredits(user.id, viewerId),
     getCollections(user.id, viewerId),
     viewerId && !isSelf
       ? db.follow.findUnique({
@@ -59,6 +70,8 @@ export default async function ProfilePage(props: {
         })
       : Promise.resolve(null),
   ]);
+
+  const tab = typeof params.tab === "string" ? params.tab : "projects";
 
   return (
     <div className="mx-auto max-w-[76rem] px-5">
@@ -128,16 +141,54 @@ export default async function ProfilePage(props: {
       </header>
 
       <section className="py-10">
-        <div className="mb-6 flex items-baseline justify-between">
-          <h2 className="label-mono">Projects</h2>
+        <div className="mb-6 flex flex-wrap gap-2">
+          {[
+            ["projects", "Projects", projects.length],
+            ["reposts", "Reposts", reposts.length],
+            ["tagged", "Tagged in", taggedIn.length],
+          ].map(([key, label, count]) => (
+            <Link
+              key={key as string}
+              href={
+                key === "projects"
+                  ? `/u/${user.handle}`
+                  : `/u/${user.handle}?tab=${key}`
+              }
+              className={
+                tab === key
+                  ? "rounded-full border border-accent bg-accent-soft px-3 py-1 text-xs text-accent"
+                  : "rounded-full border border-line-strong px-3 py-1 text-xs text-fg-muted hover:text-fg"
+              }
+            >
+              {label as string}{" "}
+              <span className="opacity-60">{count as number}</span>
+            </Link>
+          ))}
         </div>
 
-        {projects.length === 0 ? (
-          <p className="rounded-card border border-dashed border-line-strong px-6 py-14 text-center text-sm text-fg-muted">
-            {isSelf
-              ? "You have not posted anything yet."
-              : "Nothing posted yet."}
-          </p>
+        {tab === "reposts" ? (
+          reposts.length === 0 ? (
+            <EmptyTab text={isSelf ? "You have not reposted anything yet." : "Nothing reposted yet."} />
+          ) : (
+            <div className="grid gap-x-4 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+              {reposts.map((r) => (
+                <RepostCard
+                  key={r.id}
+                  project={r.project}
+                  by={{ handle: user.handle, name: user.name, image: user.image }}
+                  comment={r.comment}
+                />
+              ))}
+            </div>
+          )
+        ) : tab === "tagged" ? (
+          taggedIn.length === 0 ? (
+            <EmptyTab text={isSelf ? "Nobody has tagged you on a project yet." : "Not tagged on anything yet."} />
+          ) : (
+            <ProjectGrid projects={taggedIn.map((c) => c.project)} />
+          )
+        ) : projects.length === 0 ? (
+          <EmptyTab text={isSelf ? "You have not posted anything yet." : "Nothing posted yet."} />
         ) : (
           <ProjectGrid projects={projects} />
         )}
@@ -192,5 +243,13 @@ export default async function ProfilePage(props: {
         </div>
       ) : null}
     </div>
+  );
+}
+
+function EmptyTab({ text }: { text: string }) {
+  return (
+    <p className="rounded-card border border-dashed border-line-strong px-6 py-14 text-center text-sm text-fg-muted">
+      {text}
+    </p>
   );
 }

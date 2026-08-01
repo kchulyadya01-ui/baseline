@@ -4,7 +4,7 @@ import { upload } from "@vercel/blob/client";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { Input, Label } from "@/components/ui/primitives";
-import { createProject } from "@/lib/actions";
+import { createProject, updateProject } from "@/lib/actions";
 import { cn } from "@/lib/utils";
 
 interface UploadedImage {
@@ -20,6 +20,24 @@ interface FontEntry {
   family: string;
   fontSlug: string;
   role: string;
+}
+
+interface CreditEntry {
+  handle: string;
+  role: string;
+}
+
+export interface ProjectFormInitial {
+  id: string;
+  title: string;
+  description: string;
+  sourceUrl: string;
+  sourceCredit: string;
+  tags: string[];
+  fonts: FontEntry[];
+  colours: string[];
+  credits: CreditEntry[];
+  images: UploadedImage[];
 }
 
 const MAX_IMAGES = 10;
@@ -43,26 +61,33 @@ function readDimensions(file: File): Promise<{ width: number; height: number }> 
   });
 }
 
-export function SubmitForm({
+export function ProjectForm({
   fontSuggestions,
+  initial,
 }: {
   fontSuggestions: { slug: string; family: string }[];
+  /** Present when editing an existing project. */
+  initial?: ProjectFormInitial;
 }) {
   const router = useRouter();
   const fileInput = useRef<HTMLInputElement>(null);
+  const isEdit = Boolean(initial);
 
-  const [images, setImages] = useState<UploadedImage[]>([]);
+  const [images, setImages] = useState<UploadedImage[]>(initial?.images ?? []);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [tags, setTags] = useState("");
-  const [fonts, setFonts] = useState<FontEntry[]>([]);
-  const [colours, setColours] = useState<string[]>([]);
-  const [isOwnWork, setIsOwnWork] = useState(true);
-  const [sourceUrl, setSourceUrl] = useState("");
-  const [sourceCredit, setSourceCredit] = useState("");
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [tags, setTags] = useState((initial?.tags ?? []).join(", "));
+  const [fonts, setFonts] = useState<FontEntry[]>(initial?.fonts ?? []);
+  const [colours, setColours] = useState<string[]>(initial?.colours ?? []);
+  const [credits, setCredits] = useState<CreditEntry[]>(initial?.credits ?? []);
+  const [isOwnWork, setIsOwnWork] = useState(
+    initial ? !(initial.sourceUrl || initial.sourceCredit) : true,
+  );
+  const [sourceUrl, setSourceUrl] = useState(initial?.sourceUrl ?? "");
+  const [sourceCredit, setSourceCredit] = useState(initial?.sourceCredit ?? "");
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -121,7 +146,7 @@ export function SubmitForm({
     setFormError(null);
 
     start(async () => {
-      const result = await createProject({
+      const payload = {
         title,
         description,
         sourceUrl: isOwnWork ? "" : sourceUrl,
@@ -133,6 +158,7 @@ export function SubmitForm({
           .slice(0, 8),
         fonts: fonts.filter((f) => f.family.trim()),
         colours,
+        credits: credits.filter((c) => c.handle.trim()),
         images: images.map((image) => ({
           url: image.url,
           blobPath: image.blobPath,
@@ -141,7 +167,11 @@ export function SubmitForm({
           height: image.height,
           bytes: image.bytes,
         })),
-      });
+      };
+
+      const result = initial
+        ? await updateProject(initial.id, payload)
+        : await createProject(payload);
 
       if (!result.ok) {
         if (result.errors) setErrors(result.errors);
@@ -465,6 +495,77 @@ export function SubmitForm({
         </section>
 
         <section className="rounded-card border border-line bg-bg-raised p-5">
+          <h2 className="label-mono mb-3">Tag people</h2>
+          <p className="mb-3 text-2xs text-fg-subtle">
+            Collaborators, the client, whoever shot it. They are linked on the
+            post and it appears on their profile.
+          </p>
+
+          {credits.map((credit, index) => (
+            <div key={index} className="mb-2">
+              <div className="flex gap-1.5">
+                <div className="relative min-w-0 flex-1">
+                  <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 font-mono text-2xs text-fg-subtle">
+                    @
+                  </span>
+                  <input
+                    value={credit.handle}
+                    onChange={(e) =>
+                      setCredits((prev) =>
+                        prev.map((c, i) =>
+                          i === index
+                            ? { ...c, handle: e.target.value.replace(/^@/, "").toLowerCase() }
+                            : c,
+                        ),
+                      )
+                    }
+                    placeholder="handle"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    className="h-8 w-full rounded-control border border-line-strong bg-bg pl-5 pr-2 font-mono text-xs"
+                  />
+                </div>
+                <input
+                  value={credit.role}
+                  onChange={(e) =>
+                    setCredits((prev) =>
+                      prev.map((c, i) =>
+                        i === index ? { ...c, role: e.target.value } : c,
+                      ),
+                    )
+                  }
+                  placeholder="role"
+                  maxLength={60}
+                  className="h-8 w-24 rounded-control border border-line-strong bg-bg px-2 text-xs"
+                />
+                <button
+                  type="button"
+                  onClick={() => setCredits((prev) => prev.filter((_, i) => i !== index))}
+                  aria-label="Remove person"
+                  className="px-1 text-fg-subtle hover:text-danger"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {credits.length < 12 ? (
+            <button
+              type="button"
+              onClick={() => setCredits((prev) => [...prev, { handle: "", role: "" }])}
+              className="mt-1 w-full rounded-control border border-dashed border-line-strong py-1.5 text-xs text-fg-muted hover:text-fg"
+            >
+              + Tag someone
+            </button>
+          ) : null}
+
+          <p className="mt-2 text-2xs text-fg-subtle">
+            Handles that do not match an account are ignored.
+          </p>
+        </section>
+
+        <section className="rounded-card border border-line bg-bg-raised p-5">
           <h2 className="label-mono mb-3">Palette</h2>
           <div className="flex flex-wrap gap-1.5">
             {colours.map((hex, index) => (
@@ -513,7 +614,13 @@ export function SubmitForm({
             disabled={pending || uploading || images.length === 0 || title.trim().length < 3}
             className="h-11 w-full rounded-control bg-accent text-sm font-medium text-accent-fg transition-opacity hover:opacity-90 disabled:opacity-50"
           >
-            {pending ? "Posting…" : "Post project"}
+            {pending
+              ? isEdit
+                ? "Saving…"
+                : "Posting…"
+              : isEdit
+                ? "Save changes"
+                : "Post project"}
           </button>
           <p className="mt-2 text-2xs text-fg-subtle">
             Needs at least one image and a title.

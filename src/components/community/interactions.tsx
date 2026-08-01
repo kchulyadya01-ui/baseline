@@ -3,11 +3,13 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
+  createCollectionAndSave,
   reportContent,
   startConversation,
   toggleBlock,
   toggleFollow,
   toggleLike,
+  toggleRepost,
   toggleSave,
 } from "@/lib/actions";
 import { cn } from "@/lib/utils";
@@ -77,17 +79,27 @@ export function LikeButton({
   );
 }
 
+interface CollectionOption {
+  id: string;
+  name: string;
+  isPrivate: boolean;
+}
+
 export function SaveButton({
   projectId,
-  collections,
+  collections: initialCollections,
   initialSavedIn,
 }: {
   projectId: string;
-  collections: { id: string; name: string; isPrivate: boolean }[];
+  collections: CollectionOption[];
   initialSavedIn: string[];
 }) {
+  const [collections, setCollections] = useState(initialCollections);
   const [savedIn, setSavedIn] = useState<string[]>(initialSavedIn);
   const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newPrivate, setNewPrivate] = useState(false);
   const { pending, error, setError, start } = useAction();
   const isSaved = savedIn.length > 0;
 
@@ -108,6 +120,25 @@ export function SaveButton({
     });
   }
 
+  function createFolder() {
+    const name = newName.trim();
+    if (!name) return;
+    setError(null);
+    start(async () => {
+      const result = await createCollectionAndSave(projectId, name, newPrivate);
+      if (!result.ok) {
+        setError(result.errors?.name ?? result.error ?? "Could not create it.");
+        return;
+      }
+      const { collection } = result.data as { collection: CollectionOption };
+      setCollections((prev) => [collection, ...prev]);
+      setSavedIn((prev) => [...prev, collection.id]);
+      setNewName("");
+      setNewPrivate(false);
+      setCreating(false);
+    });
+  }
+
   return (
     <div className="relative flex flex-col items-start gap-1">
       <div className="flex">
@@ -123,12 +154,12 @@ export function SaveButton({
           )}
         >
           <span aria-hidden>⧉</span>
-          {isSaved ? "Saved" : "Save"}
+          {isSaved ? `Saved${savedIn.length > 1 ? ` ×${savedIn.length}` : ""}` : "Save"}
         </button>
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          aria-label="Choose a collection"
+          aria-label="Choose a folder"
           aria-expanded={open}
           className="inline-flex h-10 items-center rounded-r-control border border-l-0 border-line-strong px-2.5 text-xs text-fg-muted hover:text-fg"
         >
@@ -137,34 +168,191 @@ export function SaveButton({
       </div>
 
       {open ? (
-        <div className="absolute top-11 z-20 w-56 rounded-card border border-line bg-bg-raised p-1.5 shadow-lg">
-          {collections.length === 0 ? (
-            <p className="px-2.5 py-2 text-xs text-fg-subtle">
-              No collections yet — saving creates one.
-            </p>
-          ) : null}
-          {collections.map((collection) => {
-            const inThis = savedIn.includes(collection.id);
-            return (
+        <div className="absolute top-11 z-20 w-64 rounded-card border border-line bg-bg-raised p-1.5 shadow-lg">
+          <div className="max-h-56 overflow-y-auto">
+            {collections.length === 0 && !creating ? (
+              <p className="px-2.5 py-2 text-xs text-fg-subtle">
+                No folders yet. Save to make one, or name it below.
+              </p>
+            ) : null}
+
+            {collections.map((collection) => {
+              const inThis = savedIn.includes(collection.id);
+              return (
+                <button
+                  key={collection.id}
+                  type="button"
+                  onClick={() => save(collection.id)}
+                  disabled={pending}
+                  className="flex w-full items-center justify-between rounded px-2.5 py-1.5 text-left text-sm text-fg hover:bg-bg-sunken"
+                >
+                  <span className="truncate">
+                    {collection.name}
+                    {collection.isPrivate ? (
+                      <span className="ml-1 text-2xs text-fg-subtle">private</span>
+                    ) : null}
+                  </span>
+                  <span
+                    aria-hidden
+                    className={inThis ? "text-accent" : "text-fg-subtle"}
+                  >
+                    {inThis ? "✓" : "+"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-1 border-t border-line pt-1.5">
+            {creating ? (
+              <div className="space-y-2 px-1 pb-1">
+                <input
+                  autoFocus
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      createFolder();
+                    }
+                    if (e.key === "Escape") setCreating(false);
+                  }}
+                  maxLength={80}
+                  placeholder="Folder name"
+                  className="h-8 w-full rounded-control border border-line-strong bg-bg px-2 text-xs text-fg placeholder:text-fg-subtle focus:border-accent focus:outline-none"
+                />
+                <label className="flex items-center gap-1.5 text-2xs text-fg-muted">
+                  <input
+                    type="checkbox"
+                    checked={newPrivate}
+                    onChange={(e) => setNewPrivate(e.target.checked)}
+                  />
+                  Private
+                </label>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={createFolder}
+                    disabled={pending || !newName.trim()}
+                    className="h-7 flex-1 rounded-control bg-accent text-2xs font-medium text-accent-fg disabled:opacity-50"
+                  >
+                    {pending ? "Saving…" : "Create & save"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCreating(false)}
+                    className="h-7 rounded-control border border-line-strong px-2 text-2xs text-fg-muted"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
               <button
-                key={collection.id}
                 type="button"
-                onClick={() => save(collection.id)}
-                disabled={pending}
-                className="flex w-full items-center justify-between rounded px-2.5 py-1.5 text-left text-sm text-fg hover:bg-bg-sunken"
+                onClick={() => setCreating(true)}
+                className="flex w-full items-center gap-1.5 rounded px-2.5 py-1.5 text-left text-sm text-accent hover:bg-bg-sunken"
               >
-                <span className="truncate">
-                  {collection.name}
-                  {collection.isPrivate ? (
-                    <span className="ml-1 text-2xs text-fg-subtle">private</span>
-                  ) : null}
-                </span>
-                <span aria-hidden className={inThis ? "text-accent" : "text-fg-subtle"}>
-                  {inThis ? "✓" : "+"}
-                </span>
+                <span aria-hidden>+</span> New folder
               </button>
-            );
-          })}
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {error ? <span className="text-2xs text-danger">{error}</span> : null}
+    </div>
+  );
+}
+
+/**
+ * Repost, with an optional short note.
+ *
+ * Opens the note field on first click rather than reposting immediately: a
+ * repost is broadcast to everyone following you, and one keystroke of intent is
+ * worth more than an undo. Clicking again while reposted removes it.
+ */
+export function RepostButton({
+  projectId,
+  initialReposted,
+  initialCount,
+}: {
+  projectId: string;
+  initialReposted: boolean;
+  initialCount: number;
+}) {
+  const [reposted, setReposted] = useState(initialReposted);
+  const [count, setCount] = useState(initialCount);
+  const [composing, setComposing] = useState(false);
+  const [comment, setComment] = useState("");
+  const { pending, error, setError, start } = useAction();
+
+  function submit(withComment?: string) {
+    setError(null);
+    start(async () => {
+      const result = await toggleRepost(projectId, withComment);
+      if (!result.ok) {
+        setError(result.error ?? "Could not repost.");
+        return;
+      }
+      const { reposted: next } = result.data as { reposted: boolean };
+      setReposted(next);
+      setCount((c) => c + (next ? 1 : -1));
+      setComposing(false);
+      setComment("");
+    });
+  }
+
+  return (
+    <div className="relative flex flex-col items-start gap-1">
+      <button
+        type="button"
+        onClick={() => (reposted ? submit() : setComposing((v) => !v))}
+        disabled={pending}
+        aria-pressed={reposted}
+        className={cn(
+          "inline-flex h-10 items-center gap-2 rounded-control border px-4 text-sm transition-colors",
+          reposted
+            ? "border-success/40 bg-success-soft text-success"
+            : "border-line-strong text-fg-muted hover:text-fg",
+        )}
+      >
+        <span aria-hidden>⇄</span>
+        {count}
+      </button>
+
+      {composing && !reposted ? (
+        <div className="absolute top-11 z-20 w-72 rounded-card border border-line bg-bg-raised p-3 shadow-lg">
+          <div className="label-mono mb-2">Repost to your followers</div>
+          <textarea
+            autoFocus
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            maxLength={280}
+            rows={2}
+            placeholder="Add a note (optional)"
+            className="w-full rounded-control border border-line-strong bg-bg px-2.5 py-1.5 text-xs text-fg placeholder:text-fg-subtle focus:border-accent focus:outline-none"
+          />
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => submit(comment)}
+              disabled={pending}
+              className="h-8 rounded-control bg-accent px-3 text-xs font-medium text-accent-fg disabled:opacity-50"
+            >
+              {pending ? "Reposting…" : "Repost"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setComposing(false)}
+              className="h-8 rounded-control border border-line-strong px-3 text-xs text-fg-muted"
+            >
+              Cancel
+            </button>
+            <span className="ml-auto text-2xs text-fg-subtle">
+              {comment.length}/280
+            </span>
+          </div>
         </div>
       ) : null}
 

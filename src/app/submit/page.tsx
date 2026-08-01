@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { CommunityNotConfigured } from "@/components/community/not-configured";
-import { SubmitForm } from "@/components/community/submit-form";
+import { ProjectForm } from "@/components/community/project-form";
 import { requireOnboarded } from "@/lib/auth";
 import { isCommunityConfigured } from "@/lib/db";
 import { queryFonts } from "@/lib/fonts";
@@ -36,7 +36,7 @@ export default async function SubmitPage() {
         </p>
       </header>
 
-      <SubmitForm fontSuggestions={suggestions} />
+      <ProjectForm fontSuggestions={suggestions} />
     </div>
   );
 }

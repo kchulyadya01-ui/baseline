@@ -19,7 +19,11 @@ export async function SiteHeader() {
   const unread = user?.id && user.handle ? await unreadCount(user.id) : 0;
 
   const nav = communityOn
-    ? [...TOOLS, { href: "/community", label: "Community" }]
+    ? [
+        ...TOOLS,
+        { href: "/community", label: "Community" },
+        { href: "/people", label: "People" },
+      ]
     : TOOLS;
 
   return (

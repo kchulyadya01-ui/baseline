@@ -118,6 +118,51 @@ export async function updateProfile(formData: FormData): Promise<ActionResult> {
 
 // --- projects ------------------------------------------------------------
 
+/**
+ * Turn submitted handles into real account ids.
+ *
+ * Silently drops anything that is not a real account, the author themselves
+ * (they are already the author) and anyone either party has blocked. Tagging is
+ * a way to put your name on someone else's page, so it must not be usable to
+ * reach across a block.
+ */
+async function resolveCredits(
+  credits: { handle: string; role?: string }[],
+  authorId: string,
+): Promise<{ userId: string; role: string | null }[]> {
+  if (credits.length === 0) return [];
+
+  const handles = [
+    ...new Set(credits.map((c) => c.handle.trim().replace(/^@/, "").toLowerCase())),
+  ].filter(Boolean);
+  if (handles.length === 0) return [];
+
+  const [users, blocked] = await Promise.all([
+    db.user.findMany({
+      where: { handle: { in: handles }, suspendedAt: null },
+      select: { id: true, handle: true },
+    }),
+    blockedUserIds(authorId),
+  ]);
+
+  const byHandle = new Map(users.map((u) => [u.handle!.toLowerCase(), u.id]));
+  const seen = new Set<string>();
+  const out: { userId: string; role: string | null }[] = [];
+
+  for (const credit of credits) {
+    const key = credit.handle.trim().replace(/^@/, "").toLowerCase();
+    const userId = byHandle.get(key);
+    if (!userId) continue;
+    if (userId === authorId) continue;
+    if (blocked.includes(userId)) continue;
+    if (seen.has(userId)) continue;
+    seen.add(userId);
+    out.push({ userId, role: credit.role?.trim() || null });
+  }
+
+  return out;
+}
+
 export async function createProject(input: unknown): Promise<ActionResult> {
   let user;
   try {
@@ -156,6 +201,8 @@ export async function createProject(input: unknown): Promise<ActionResult> {
       tagIds.push(tag.id);
     }
 
+    const creditUserIds = await resolveCredits(data.credits, user.id);
+
     await db.project.create({
       data: {
         slug,
@@ -164,6 +211,9 @@ export async function createProject(input: unknown): Promise<ActionResult> {
         sourceUrl: data.sourceUrl || null,
         sourceCredit: data.sourceCredit || null,
         authorId: user.id,
+        credits: {
+          create: creditUserIds.map((c) => ({ userId: c.userId, role: c.role })),
+        },
         images: {
           create: data.images.map((image, index) => ({
             url: image.url,
@@ -201,6 +251,133 @@ export async function createProject(input: unknown): Promise<ActionResult> {
   revalidatePath("/community");
   revalidatePath(`/u/${user.handle}`);
   return { ok: true, data: { slug } };
+}
+
+/**
+ * Edit a project.
+ *
+ * Children (images, colours, fonts, tags, credits) are replaced wholesale
+ * rather than diffed: the form always submits the complete intended state, and
+ * a delete-then-recreate is both simpler to reason about and impossible to get
+ * subtly wrong. The slug never changes, so existing links keep working.
+ *
+ * Images removed in the editor have their blobs deleted too — otherwise every
+ * edit leaks storage.
+ */
+export async function updateProject(
+  projectId: string,
+  input: unknown,
+): Promise<ActionResult> {
+  let user;
+  try {
+    user = await requireOnboarded();
+  } catch (error) {
+    return failure(error);
+  }
+
+  const existing = await db.project.findUnique({
+    where: { id: projectId },
+    select: {
+      authorId: true,
+      slug: true,
+      status: true,
+      images: { select: { blobPath: true } },
+    },
+  });
+  if (!existing) return { ok: false, error: "Not found." };
+  if (existing.authorId !== user.id) {
+    return { ok: false, error: "Not yours to edit." };
+  }
+  if (existing.status === "REMOVED") {
+    return { ok: false, error: "A moderator removed this post; it cannot be edited." };
+  }
+
+  const parsed = projectSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error) };
+  const data = parsed.data;
+
+  try {
+    const tagIds: string[] = [];
+    for (const label of data.tags) {
+      const tagSlug = slugify(label);
+      if (!tagSlug) continue;
+      const tag = await db.tag.upsert({
+        where: { slug: tagSlug },
+        create: { slug: tagSlug, label },
+        update: {},
+        select: { id: true },
+      });
+      tagIds.push(tag.id);
+    }
+
+    const creditUserIds = await resolveCredits(data.credits, user.id);
+
+    await db.project.update({
+      where: { id: projectId },
+      data: {
+        title: data.title,
+        description: data.description || null,
+        sourceUrl: data.sourceUrl || null,
+        sourceCredit: data.sourceCredit || null,
+        images: {
+          deleteMany: {},
+          create: data.images.map((image, index) => ({
+            url: image.url,
+            blobPath: image.blobPath,
+            alt: image.alt || null,
+            width: image.width,
+            height: image.height,
+            bytes: image.bytes,
+            position: index,
+          })),
+        },
+        colours: {
+          deleteMany: {},
+          create: data.colours.map((hex, index) => ({
+            hex: hex.toLowerCase(),
+            position: index,
+          })),
+        },
+        fonts: {
+          deleteMany: {},
+          create: data.fonts.map((font) => ({
+            family: font.family,
+            fontSlug: font.fontSlug || null,
+            role: font.role || null,
+          })),
+        },
+        tags: {
+          deleteMany: {},
+          create: [...new Set(tagIds)].map((tagId) => ({ tagId })),
+        },
+        credits: {
+          deleteMany: {},
+          create: creditUserIds.map((c) => ({ userId: c.userId, role: c.role })),
+        },
+      },
+    });
+
+    // Blobs for images the editor dropped. Done after the row is consistent,
+    // so a storage failure never leaves the post pointing at a deleted file.
+    const keptPaths = new Set(data.images.map((i) => i.blobPath));
+    const orphaned = existing.images
+      .map((i) => i.blobPath)
+      .filter((path) => !keptPaths.has(path));
+    if (hasBlobStore() && orphaned.length) {
+      try {
+        await del(orphaned);
+      } catch {
+        // Non-fatal; prune-orphan-blobs picks these up.
+      }
+    }
+  } catch (error) {
+    return failure(error);
+  }
+
+  revalidatePath(`/community/${existing.slug}`);
+  revalidatePath("/community");
+  revalidatePath(`/u/${user.handle}`);
+  return { ok: true, data: { slug: existing.slug } };
 }
 
 export async function deleteProject(projectId: string): Promise<ActionResult> {
@@ -269,6 +446,68 @@ export async function toggleLike(projectId: string): Promise<ActionResult> {
   return { ok: true, data: { liked } };
 }
 
+// --- reposts -------------------------------------------------------------
+
+/**
+ * Repost or un-repost someone's project.
+ *
+ * A repost points at the original — it never copies the images or the author,
+ * so the credit cannot drift and there is only ever one canonical page for a
+ * piece of work. Reposting your own project is refused: it is an endorsement of
+ * someone else, and self-reposting is just a way to jump the feed twice.
+ */
+export async function toggleRepost(
+  projectId: string,
+  comment?: string,
+): Promise<ActionResult> {
+  const user = await getOnboardedUser();
+  if (!user) return { ok: false, error: "Sign in to repost." };
+
+  const project = await db.project.findUnique({
+    where: { id: projectId },
+    select: { authorId: true, slug: true, status: true },
+  });
+  if (!project) return { ok: false, error: "Not found." };
+  if (project.status !== "PUBLISHED") {
+    return { ok: false, error: "That post is not available." };
+  }
+  if (project.authorId === user.id) {
+    return { ok: false, error: "You cannot repost your own work." };
+  }
+
+  try {
+    await assertNotBlocked(user.id, project.authorId);
+    await enforceRateLimit("repost", user.id);
+  } catch (error) {
+    return failure(error);
+  }
+
+  const existing = await db.repost.findUnique({
+    where: { userId_projectId: { userId: user.id, projectId } },
+    select: { id: true },
+  });
+
+  const reposted = !existing;
+  const trimmed = comment?.trim().slice(0, 280) || null;
+
+  await db.$transaction([
+    existing
+      ? db.repost.delete({ where: { id: existing.id } })
+      : db.repost.create({
+          data: { userId: user.id, projectId, comment: trimmed },
+        }),
+    db.project.update({
+      where: { id: projectId },
+      data: { repostCount: { increment: reposted ? 1 : -1 } },
+    }),
+  ]);
+
+  revalidatePath(`/community/${project.slug}`);
+  revalidatePath("/community");
+  revalidatePath(`/u/${user.handle}`);
+  return { ok: true, data: { reposted } };
+}
+
 // --- collections ---------------------------------------------------------
 
 export async function createCollection(formData: FormData): Promise<ActionResult> {
@@ -306,6 +545,71 @@ export async function createCollection(formData: FormData): Promise<ActionResult
 
   revalidatePath("/collections");
   return { ok: true, data: collection };
+}
+
+/**
+ * Create a folder and drop a project straight into it.
+ *
+ * The save menu needs this because the alternative is leaving the page to make
+ * a folder and coming back — which is exactly the moment someone gives up and
+ * the save never happens. Naming and saving are one action.
+ */
+export async function createCollectionAndSave(
+  projectId: string,
+  name: string,
+  isPrivate = false,
+): Promise<ActionResult> {
+  const user = await getOnboardedUser();
+  if (!user) return { ok: false, error: "Sign in to save work." };
+
+  const parsed = collectionSchema.safeParse({ name, description: "", isPrivate });
+  if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error) };
+
+  const project = await db.project.findUnique({
+    where: { id: projectId },
+    select: { authorId: true, slug: true },
+  });
+  if (!project) return { ok: false, error: "Not found." };
+
+  try {
+    await assertNotBlocked(user.id, project.authorId);
+    await enforceRateLimit("save", user.id);
+  } catch (error) {
+    return failure(error);
+  }
+
+  const base = slugify(parsed.data.name) || "collection";
+  let slug = base;
+  let attempt = 1;
+  while (
+    await db.collection.findUnique({
+      where: { ownerId_slug: { ownerId: user.id, slug } },
+      select: { id: true },
+    })
+  ) {
+    slug = `${base}-${++attempt}`;
+  }
+
+  const collection = await db.collection.create({
+    data: {
+      name: parsed.data.name,
+      slug,
+      isPrivate: parsed.data.isPrivate,
+      ownerId: user.id,
+      itemCount: 1,
+      saves: { create: { userId: user.id, projectId } },
+    },
+    select: { id: true, name: true, isPrivate: true },
+  });
+
+  await db.project.update({
+    where: { id: projectId },
+    data: { saveCount: { increment: 1 } },
+  });
+
+  revalidatePath(`/community/${project.slug}`);
+  revalidatePath("/collections");
+  return { ok: true, data: { collection } };
 }
 
 /**

@@ -34,6 +34,9 @@ export const LIMITS = {
   conversationStart: { limit: 10, windowSeconds: 86400 },
   follow: { limit: 200, windowSeconds: 3600 },
   save: { limit: 300, windowSeconds: 3600 },
+  // Reposting is the cheapest way to spam a feed, so it is tighter than saving:
+  // a save is private, a repost is broadcast to everyone following you.
+  repost: { limit: 60, windowSeconds: 3600 },
   report: { limit: 20, windowSeconds: 86400 },
   handleChange: { limit: 3, windowSeconds: 2592000 },
 } as const satisfies Record<string, RateLimitRule>;

@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CommunityNotConfigured } from "@/components/community/not-configured";
-import { ProjectGrid } from "@/components/community/project-card";
+import { ProjectCard, ProjectGrid } from "@/components/community/project-card";
+import { RepostCard } from "@/components/community/repost-card";
 import { ButtonLink } from "@/components/ui/button";
 import { auth } from "@/lib/auth";
-import { getFeed, type FeedSort } from "@/lib/community";
+import { getFeed, getRepostsFromFollowing, type FeedSort } from "@/lib/community";
 import { isCommunityConfigured } from "@/lib/db";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +44,26 @@ export default async function CommunityPage(props: {
   const q = single("q");
 
   const { projects } = await getFeed({ sort, tag, fontSlug, q, viewerId });
+
+  // The Following feed interleaves original posts with reposts from the same
+  // people, ordered by when each appeared. Reposts only belong here — putting
+  // them in Recent or Popular would let one project occupy the grid twice.
+  const reposts =
+    sort === "following" && viewerId && !tag && !fontSlug && !q
+      ? await getRepostsFromFollowing(viewerId)
+      : [];
+
+  const followingRows = [
+    ...projects.map((p) => ({ kind: "post" as const, at: p.publishedAt, project: p })),
+    ...reposts.map((r) => ({
+      kind: "repost" as const,
+      at: r.createdAt,
+      project: r.project,
+      by: r.user,
+      comment: r.comment,
+      id: r.id,
+    })),
+  ].sort((a, b) => b.at.getTime() - a.at.getTime());
 
   const filterLabel = tag
     ? `#${tag}`
@@ -103,7 +124,26 @@ export default async function CommunityPage(props: {
       </div>
 
       <div className="py-8">
-        {projects.length === 0 ? (
+        {sort === "following" ? (
+          followingRows.length === 0 ? (
+            <EmptyFeed sort={sort} signedIn={Boolean(viewerId)} />
+          ) : (
+            <div className="grid gap-x-4 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+              {followingRows.map((row) =>
+                row.kind === "repost" ? (
+                  <RepostCard
+                    key={`r-${row.id}`}
+                    project={row.project}
+                    by={row.by}
+                    comment={row.comment}
+                  />
+                ) : (
+                  <ProjectCard key={row.project.id} project={row.project} />
+                ),
+              )}
+            </div>
+          )
+        ) : projects.length === 0 ? (
           <EmptyFeed sort={sort} signedIn={Boolean(viewerId)} />
         ) : (
           <ProjectGrid projects={projects} />

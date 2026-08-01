@@ -37,6 +37,7 @@ export const PROJECT_CARD_SELECT = {
   title: true,
   likeCount: true,
   saveCount: true,
+  repostCount: true,
   publishedAt: true,
   author: { select: { id: true, handle: true, name: true, image: true } },
   images: {
@@ -133,6 +134,12 @@ export async function getProject(slug: string, viewerId: string | null) {
       colours: { orderBy: { position: "asc" } },
       fonts: true,
       tags: { include: { tag: true } },
+      credits: {
+        include: {
+          user: { select: { id: true, handle: true, name: true, image: true } },
+        },
+        orderBy: { createdAt: "asc" },
+      },
     },
   });
 
@@ -152,12 +159,18 @@ export async function getProject(slug: string, viewerId: string | null) {
   return project;
 }
 
-/** Viewer-specific state for a project: liked, saved, following the author. */
+/** Viewer-specific state for a project: liked, saved, reposted, following. */
 export async function getViewerState(projectId: string, authorId: string, viewerId: string | null) {
   if (!viewerId) {
-    return { liked: false, savedIn: [] as string[], following: false, isAuthor: false };
+    return {
+      liked: false,
+      savedIn: [] as string[],
+      reposted: false,
+      following: false,
+      isAuthor: false,
+    };
   }
-  const [like, saves, follow] = await Promise.all([
+  const [like, saves, repost, follow] = await Promise.all([
     db.like.findUnique({
       where: { userId_projectId: { userId: viewerId, projectId } },
       select: { id: true },
@@ -165,6 +178,10 @@ export async function getViewerState(projectId: string, authorId: string, viewer
     db.save.findMany({
       where: { userId: viewerId, projectId },
       select: { collectionId: true },
+    }),
+    db.repost.findUnique({
+      where: { userId_projectId: { userId: viewerId, projectId } },
+      select: { id: true },
     }),
     viewerId === authorId
       ? Promise.resolve(null)
@@ -179,9 +196,165 @@ export async function getViewerState(projectId: string, authorId: string, viewer
   return {
     liked: Boolean(like),
     savedIn: saves.map((s) => s.collectionId),
+    reposted: Boolean(repost),
     following: Boolean(follow),
     isAuthor: viewerId === authorId,
   };
+}
+
+// --- reposts -------------------------------------------------------------
+
+/**
+ * Projects reposted by the people you follow, each carrying who reposted it.
+ *
+ * Kept as a separate query rather than folded into `getFeed`: a repost is a
+ * different kind of feed row (it needs attribution and its own timestamp), and
+ * merging two orderings inside one Prisma query means raw SQL for no real gain
+ * at this size. The caller interleaves them by date.
+ */
+export async function getRepostsFromFollowing(viewerId: string, take = 24) {
+  const [follows, excluded] = await Promise.all([
+    db.follow.findMany({
+      where: { followerId: viewerId },
+      select: { followingId: true },
+    }),
+    blockedUserIds(viewerId),
+  ]);
+
+  const followingIds = follows.map((f) => f.followingId);
+  if (followingIds.length === 0) return [];
+
+  return db.repost.findMany({
+    where: {
+      userId: { in: followingIds },
+      project: {
+        status: "PUBLISHED",
+        ...(excluded.length ? { authorId: { notIn: excluded } } : {}),
+      },
+    },
+    select: {
+      id: true,
+      comment: true,
+      createdAt: true,
+      user: { select: { id: true, handle: true, name: true, image: true } },
+      project: { select: PROJECT_CARD_SELECT },
+    },
+    orderBy: { createdAt: "desc" },
+    take,
+  });
+}
+
+/** Everything a person has reposted, for the Reposts tab on their profile. */
+export async function getUserReposts(userId: string, viewerId: string | null) {
+  const excluded = await blockedUserIds(viewerId);
+
+  return db.repost.findMany({
+    where: {
+      userId,
+      project: {
+        status: "PUBLISHED",
+        ...(excluded.length ? { authorId: { notIn: excluded } } : {}),
+      },
+    },
+    select: {
+      id: true,
+      comment: true,
+      createdAt: true,
+      project: { select: PROJECT_CARD_SELECT },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 48,
+  });
+}
+
+/** Projects someone else tagged this person on, for the "Tagged in" tab. */
+export async function getUserCredits(userId: string, viewerId: string | null) {
+  const excluded = await blockedUserIds(viewerId);
+
+  return db.projectCredit.findMany({
+    where: {
+      userId,
+      project: {
+        status: "PUBLISHED",
+        ...(excluded.length ? { authorId: { notIn: excluded } } : {}),
+      },
+    },
+    select: {
+      id: true,
+      role: true,
+      project: { select: PROJECT_CARD_SELECT },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 48,
+  });
+}
+
+// --- people search -------------------------------------------------------
+
+export interface PeopleSearchOptions {
+  q?: string;
+  viewerId?: string | null;
+  take?: number;
+}
+
+/**
+ * Find people by handle, display name or bio.
+ *
+ * Ordered by follower count so a search for a common word surfaces the people
+ * others already found. Suspended and blocked accounts never appear — a block
+ * that still let you search for someone would not be much of a block.
+ */
+export async function searchPeople({
+  q = "",
+  viewerId = null,
+  take = 40,
+}: PeopleSearchOptions) {
+  const needle = q.trim();
+  const excluded = await blockedUserIds(viewerId);
+
+  const users = await db.user.findMany({
+    where: {
+      handle: { not: null },
+      suspendedAt: null,
+      ...(excluded.length ? { id: { notIn: excluded } } : {}),
+      ...(needle
+        ? {
+            OR: [
+              { handle: { contains: needle, mode: "insensitive" as const } },
+              { name: { contains: needle, mode: "insensitive" as const } },
+              { bio: { contains: needle, mode: "insensitive" as const } },
+            ],
+          }
+        : {}),
+    },
+    select: {
+      id: true,
+      handle: true,
+      name: true,
+      image: true,
+      bio: true,
+      location: true,
+      _count: { select: { projects: true, followers: true } },
+    },
+    orderBy: [{ followers: { _count: "desc" } }, { createdAt: "asc" }],
+    take,
+  });
+
+  // Which of these the viewer already follows, in one query rather than N.
+  let followingIds = new Set<string>();
+  if (viewerId && users.length) {
+    const follows = await db.follow.findMany({
+      where: { followerId: viewerId, followingId: { in: users.map((u) => u.id) } },
+      select: { followingId: true },
+    });
+    followingIds = new Set(follows.map((f) => f.followingId));
+  }
+
+  return users.map((user) => ({
+    ...user,
+    isFollowing: followingIds.has(user.id),
+    isSelf: user.id === viewerId,
+  }));
 }
 
 export async function getProfile(handle: string, viewerId: string | null) {

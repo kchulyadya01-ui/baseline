@@ -71,6 +71,18 @@ export const projectSchema = z.object({
     .max(8)
     .default([]),
   colours: z.array(hexSchema).max(12).default([]),
+  // People tagged on the work. Handles are resolved to accounts server-side;
+  // anything that does not match a real account is dropped rather than stored
+  // as a dangling name.
+  credits: z
+    .array(
+      z.object({
+        handle: z.string().trim().min(1).max(24),
+        role: z.string().trim().max(60).optional().or(z.literal("")),
+      }),
+    )
+    .max(12)
+    .default([]),
   images: z
     .array(
       z.object({
