@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { CommunityNav } from "@/components/community/community-nav";
 import { CommunityNotConfigured } from "@/components/community/not-configured";
 import { ProjectCard, ProjectGrid } from "@/components/community/project-card";
 import { RepostCard } from "@/components/community/repost-card";
@@ -75,6 +76,9 @@ export default async function CommunityPage(props: {
 
   return (
     <div className="mx-auto max-w-[76rem] px-5">
+      <div className="pt-6">
+        <CommunityNav active="feed" />
+      </div>
       <header className="pt-12 pb-8">
         <span className="label-mono">05 · Community</span>
         <div className="mt-3 flex flex-wrap items-end justify-between gap-4">

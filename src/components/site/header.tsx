@@ -22,12 +22,10 @@ const TOOLS = [
 export function SiteHeader() {
   const communityOn = isCommunityConfigured();
 
+  // People lives under Community rather than beside it — it is a way of
+  // navigating the community, not a fifth tool.
   const nav = communityOn
-    ? [
-        ...TOOLS,
-        { href: "/community", label: "Community" },
-        { href: "/people", label: "People" },
-      ]
+    ? [...TOOLS, { href: "/community", label: "Community" }]
     : TOOLS;
 
   return (

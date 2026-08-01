@@ -763,7 +763,8 @@ model ConversationMember {
 
 model Message {
   id        String   @id @default(cuid())
-  body      String   @db.VarChar(4000)
+  /// Empty when the message is only attachments.
+  body      String   @db.VarChar(4000) @default("")
   createdAt DateTime @default(now())
   // Soft delete: the row stays so the thread keeps its shape.
   deletedAt DateTime?
@@ -774,10 +775,46 @@ model Message {
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender       User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
 
-  reports Report[]
+  attachments MessageAttachment[]
+  reports     Report[]
 
   @@index([conversationId, createdAt])
   @@map("messages")
+}
+
+/// A photo or file sent in a message.
+///
+/// `kind` is stored rather than derived from the mime type at read time so the
+/// Media / Docs split in the conversation panel is a plain indexed filter
+/// instead of a scan plus string matching on every render.
+model MessageAttachment {
+  id        String              @id @default(cuid())
+  kind      AttachmentKind
+  url       String
+  blobPath  String
+  name      String              @db.VarChar(255)
+  mimeType  String              @db.VarChar(120)
+  bytes     Int
+  /// Images only; null for documents.
+  width     Int?
+  height    Int?
+  position  Int                 @default(0)
+  createdAt DateTime            @default(now())
+
+  messageId      String
+  /// Denormalised so the conversation media panel does not have to join
+  /// through messages to list everything shared in a thread.
+  conversationId String
+  message        Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, kind, createdAt])
+  @@index([messageId, position])
+  @@map("message_attachments")
+}
+
+enum AttachmentKind {
+  IMAGE
+  FILE
 }
 
 // --- moderation ----------------------------------------------------------

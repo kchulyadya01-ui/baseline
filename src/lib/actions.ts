@@ -911,14 +911,38 @@ export async function startConversation(targetUserId: string): Promise<ActionRes
   return { ok: true, data: { conversationId: conversation.id } };
 }
 
+export interface OutgoingAttachment {
+  kind: "IMAGE" | "FILE";
+  url: string;
+  blobPath: string;
+  name: string;
+  mimeType: string;
+  bytes: number;
+  width?: number | null;
+  height?: number | null;
+}
+
 export async function sendMessage(
   conversationId: string,
   formData: FormData,
+  attachments: OutgoingAttachment[] = [],
 ): Promise<ActionResult> {
   const user = await getOnboardedUser();
   if (!user) return { ok: false, error: "Sign in to send messages." };
 
-  const parsed = messageSchema.safeParse({ body: formData.get("body") });
+  const rawBody = String(formData.get("body") ?? "").trim();
+
+  // A message may be attachments alone, but it cannot be nothing at all.
+  if (!rawBody && attachments.length === 0) {
+    return { ok: false, errors: { body: "Write something or attach a file." } };
+  }
+  if (attachments.length > 10) {
+    return { ok: false, error: "Ten attachments maximum." };
+  }
+
+  const parsed = rawBody
+    ? messageSchema.safeParse({ body: rawBody })
+    : ({ success: true, data: { body: "" } } as const);
   if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error) };
 
   const membership = await db.conversationMember.findUnique({
@@ -949,7 +973,27 @@ export async function sendMessage(
 
   await db.$transaction([
     db.message.create({
-      data: { conversationId, senderId: user.id, body: parsed.data.body },
+      data: {
+        conversationId,
+        senderId: user.id,
+        body: parsed.data.body,
+        attachments: {
+          create: attachments.map((attachment, index) => ({
+            kind: attachment.kind,
+            url: attachment.url,
+            blobPath: attachment.blobPath,
+            name: attachment.name.slice(0, 255),
+            mimeType: attachment.mimeType.slice(0, 120),
+            bytes: attachment.bytes,
+            width: attachment.width ?? null,
+            height: attachment.height ?? null,
+            position: index,
+            // Denormalised so the media panel lists a thread's files without
+            // joining through messages.
+            conversationId,
+          })),
+        },
+      },
     }),
     db.conversation.update({
       where: { id: conversationId },

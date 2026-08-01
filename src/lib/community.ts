@@ -549,6 +549,19 @@ export async function getConversation(conversationId: string, userId: string) {
           body: true,
           createdAt: true,
           senderId: true,
+          attachments: {
+            select: {
+              id: true,
+              kind: true,
+              url: true,
+              name: true,
+              mimeType: true,
+              bytes: true,
+              width: true,
+              height: true,
+            },
+            orderBy: { position: "asc" },
+          },
         },
       },
     },
@@ -567,6 +580,92 @@ export async function getConversation(conversationId: string, userId: string) {
     messages: conversation.messages,
     // The thread stays readable after a block; it just cannot be replied to.
     isBlocked: blocked.includes(other.id),
+  };
+}
+
+/**
+ * Everything shared in a thread, for the Media / Links / Docs panel.
+ *
+ * Links are pulled out of message bodies rather than stored: a URL in a
+ * sentence is not an entity anyone creates deliberately, and extracting on read
+ * means old messages are covered without a backfill.
+ */
+export async function getConversationShared(
+  conversationId: string,
+  userId: string,
+) {
+  const membership = await db.conversationMember.findUnique({
+    where: { conversationId_userId: { conversationId, userId } },
+    select: { id: true },
+  });
+  if (!membership) return null;
+
+  const [attachments, messages, other] = await Promise.all([
+    db.messageAttachment.findMany({
+      where: { conversationId },
+      select: {
+        id: true,
+        kind: true,
+        url: true,
+        name: true,
+        mimeType: true,
+        bytes: true,
+        width: true,
+        height: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 400,
+    }),
+    db.message.findMany({
+      where: { conversationId, deletedAt: null, body: { contains: "http" } },
+      select: { id: true, body: true, createdAt: true, senderId: true },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+    }),
+    db.conversationMember.findFirst({
+      where: { conversationId, userId: { not: userId } },
+      select: {
+        user: { select: { id: true, handle: true, name: true, image: true } },
+      },
+    }),
+  ]);
+
+  const links: {
+    id: string;
+    url: string;
+    host: string;
+    createdAt: Date;
+    mine: boolean;
+  }[] = [];
+
+  const seen = new Set<string>();
+  for (const message of messages) {
+    for (const match of message.body.matchAll(/https?:\/\/[^\s<>"')]+/g)) {
+      const url = match[0].replace(/[.,;:!?]+$/, "");
+      if (seen.has(url)) continue;
+      seen.add(url);
+      let host = url;
+      try {
+        host = new URL(url).host;
+      } catch {
+        continue;
+      }
+      links.push({
+        id: `${message.id}-${links.length}`,
+        url,
+        host,
+        createdAt: message.createdAt,
+        mine: message.senderId === userId,
+      });
+    }
+  }
+
+  return {
+    other: other?.user ?? null,
+    media: attachments.filter((a) => a.kind === "IMAGE"),
+    docs: attachments.filter((a) => a.kind === "FILE"),
+    links,
   };
 }
 

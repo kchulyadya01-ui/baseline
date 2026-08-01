@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Avatar } from "@/components/community/avatar";
 import { FollowButton } from "@/components/community/interactions";
+import { CommunityNav } from "@/components/community/community-nav";
 import { CommunityNotConfigured } from "@/components/community/not-configured";
 import { PeopleSearch } from "@/components/community/people-search";
 import { auth } from "@/lib/auth";
@@ -33,6 +34,9 @@ export default async function PeoplePage(props: {
 
   return (
     <div className="mx-auto max-w-[52rem] px-5">
+      <div className="pt-6">
+        <CommunityNav active="people" />
+      </div>
       <header className="pt-12 pb-6">
         <span className="label-mono">Community</span>
         <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight">

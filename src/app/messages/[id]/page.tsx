@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Avatar } from "@/components/community/avatar";
 import { ReportMenu } from "@/components/community/interactions";
+import { MessageAttachments } from "@/components/community/message-attachments";
 import { MessageComposer } from "@/components/community/message-composer";
 import { CommunityNotConfigured } from "@/components/community/not-configured";
 import { requireOnboarded } from "@/lib/auth";
@@ -54,7 +55,13 @@ export default async function ConversationPage(props: {
             {conversation.other.name ?? `@${conversation.other.handle}`}
           </span>
         </Link>
-        <div className="ml-auto">
+        <Link
+          href={`/messages/${id}/shared`}
+          className="ml-auto text-xs text-fg-muted underline underline-offset-4 hover:text-fg"
+        >
+          Media, links and docs
+        </Link>
+        <div>
           <ReportMenu
             userId={conversation.other.id}
             targetUserId={conversation.other.id}
@@ -78,11 +85,17 @@ export default async function ConversationPage(props: {
                 <div
                   className={
                     mine
-                      ? "max-w-[80%] rounded-card rounded-br-sm bg-accent px-4 py-2.5 text-sm text-accent-fg"
-                      : "max-w-[80%] rounded-card rounded-bl-sm border border-line bg-bg-raised px-4 py-2.5 text-sm text-fg"
+                      ? "max-w-[80%] space-y-2 rounded-card rounded-br-sm bg-accent px-4 py-2.5 text-sm text-accent-fg"
+                      : "max-w-[80%] space-y-2 rounded-card rounded-bl-sm border border-line bg-bg-raised px-4 py-2.5 text-sm text-fg"
                   }
                 >
-                  <p className="whitespace-pre-wrap break-words">{message.body}</p>
+                  <MessageAttachments
+                    attachments={message.attachments}
+                    mine={mine}
+                  />
+                  {message.body ? (
+                    <p className="whitespace-pre-wrap break-words">{message.body}</p>
+                  ) : null}
                   <p
                     className={
                       mine

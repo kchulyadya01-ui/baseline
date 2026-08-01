@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { NewCollectionForm } from "@/components/community/new-collection-form";
+import { CommunityNav } from "@/components/community/community-nav";
 import { CommunityNotConfigured } from "@/components/community/not-configured";
 import { requireOnboarded } from "@/lib/auth";
 import { getCollections } from "@/lib/community";
@@ -22,6 +23,9 @@ export default async function CollectionsPage() {
 
   return (
     <div className="mx-auto max-w-[76rem] px-5">
+      <div className="pt-6">
+        <CommunityNav active="collections" />
+      </div>
       <header className="pt-12 pb-8">
         <span className="label-mono">Community</span>
         <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
