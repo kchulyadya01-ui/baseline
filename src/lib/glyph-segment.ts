@@ -86,6 +86,10 @@ export function otsuThreshold(grey: Grey): number {
 /**
  * Binarise so ink is 1.
  *
+ * The comparison is `<=`, not `<`. Otsu returns the last value belonging to the
+ * darker class, so for black-on-white text — where the whole dark mode sits at
+ * exactly 0 — a strict `<` marks nothing at all and the mask comes back empty.
+ *
  * Which side is ink is decided by counting: text occupies far less area than
  * its background in any real screenshot, so whichever side is rarer is the ink.
  */
@@ -93,13 +97,13 @@ export function binarise(grey: Grey): Uint8Array {
   const threshold = otsuThreshold(grey);
   const mask = new Uint8Array(grey.data.length);
 
-  let below = 0;
-  for (const value of grey.data) if (value < threshold) below += 1;
-  const inkIsDark = below <= grey.data.length / 2;
+  let dark = 0;
+  for (const value of grey.data) if (value <= threshold) dark += 1;
+  const inkIsDark = dark <= grey.data.length / 2;
 
   for (let i = 0; i < grey.data.length; i += 1) {
-    const dark = grey.data[i] < threshold;
-    mask[i] = (inkIsDark ? dark : !dark) ? 1 : 0;
+    const isDark = grey.data[i] <= threshold;
+    mask[i] = (inkIsDark ? isDark : !isDark) ? 1 : 0;
   }
 
   return mask;
