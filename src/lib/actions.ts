@@ -134,57 +134,65 @@ export async function createProject(input: unknown): Promise<ActionResult> {
   const slug = projectSlug(data.title);
 
   try {
-    await db.$transaction(async (tx) => {
-      const project = await tx.project.create({
-        data: {
-          slug,
-          title: data.title,
-          description: data.description || null,
-          sourceUrl: data.sourceUrl || null,
-          sourceCredit: data.sourceCredit || null,
-          authorId: user.id,
-          images: {
-            create: data.images.map((image, index) => ({
-              url: image.url,
-              blobPath: image.blobPath,
-              alt: image.alt || null,
-              width: image.width,
-              height: image.height,
-              bytes: image.bytes,
-              position: index,
-            })),
-          },
-          colours: {
-            create: data.colours.map((hex, index) => ({
-              hex: hex.toLowerCase(),
-              position: index,
-            })),
-          },
-          fonts: {
-            create: data.fonts.map((font) => ({
-              family: font.family,
-              fontSlug: font.fontSlug || null,
-              role: font.role || null,
-            })),
-          },
-        },
+    // Tags are shared rows across projects, so they are resolved before the
+    // project is created and then connected to it.
+    //
+    // This deliberately does NOT run inside an interactive transaction.
+    // Neon's pooled connection string puts PgBouncer in transaction-pooling
+    // mode in front of Postgres, where consecutive statements can land on
+    // different backend connections — so Prisma's interactive transactions
+    // fail with "Transaction not found". A single nested `create` is one
+    // statement and atomic on its own, which is all this needs.
+    const tagIds: string[] = [];
+    for (const label of data.tags) {
+      const tagSlug = slugify(label);
+      if (!tagSlug) continue;
+      const tag = await db.tag.upsert({
+        where: { slug: tagSlug },
+        create: { slug: tagSlug, label },
+        update: {},
         select: { id: true },
       });
+      tagIds.push(tag.id);
+    }
 
-      // Tags are shared rows, so connectOrCreate rather than create.
-      for (const label of data.tags) {
-        const tagSlug = slugify(label);
-        if (!tagSlug) continue;
-        const tag = await tx.tag.upsert({
-          where: { slug: tagSlug },
-          create: { slug: tagSlug, label },
-          update: {},
-          select: { id: true },
-        });
-        await tx.projectTag.create({
-          data: { projectId: project.id, tagId: tag.id },
-        });
-      }
+    await db.project.create({
+      data: {
+        slug,
+        title: data.title,
+        description: data.description || null,
+        sourceUrl: data.sourceUrl || null,
+        sourceCredit: data.sourceCredit || null,
+        authorId: user.id,
+        images: {
+          create: data.images.map((image, index) => ({
+            url: image.url,
+            blobPath: image.blobPath,
+            alt: image.alt || null,
+            width: image.width,
+            height: image.height,
+            bytes: image.bytes,
+            position: index,
+          })),
+        },
+        colours: {
+          create: data.colours.map((hex, index) => ({
+            hex: hex.toLowerCase(),
+            position: index,
+          })),
+        },
+        fonts: {
+          create: data.fonts.map((font) => ({
+            family: font.family,
+            fontSlug: font.fontSlug || null,
+            role: font.role || null,
+          })),
+        },
+        tags: {
+          create: [...new Set(tagIds)].map((tagId) => ({ tagId })),
+        },
+      },
+      select: { id: true },
     });
   } catch (error) {
     return failure(error);

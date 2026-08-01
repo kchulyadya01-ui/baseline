@@ -31,15 +31,25 @@ function createClient(): PrismaClient {
         "see README.md for setup.",
     );
   }
-  const client = new PrismaClient({
-    adapter: new PrismaPg({ connectionString }),
-  });
-  if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = client;
-  return client;
+  return new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
 }
 
+/**
+ * The client is cached on globalThis in EVERY environment, production included.
+ *
+ * The familiar "only cache outside production" snippet exists for a long-running
+ * server that builds its client once at module scope anyway. Here the client is
+ * built lazily behind a proxy, so skipping the cache in production meant every
+ * single property access — `db.project`, `db.tag`, `db.$transaction` — created a
+ * new PrismaClient with its own connection pool. Pools churned and were disposed
+ * mid-request, surfacing as "Transaction not found … or was obtained before
+ * disconnecting" when posting a project.
+ *
+ * On serverless, reusing one client across warm invocations is what you want.
+ */
 function getClient(): PrismaClient {
-  return globalForPrisma.prisma ?? createClient();
+  globalForPrisma.prisma ??= createClient();
+  return globalForPrisma.prisma;
 }
 
 export const db = new Proxy({} as PrismaClient, {
