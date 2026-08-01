@@ -693,6 +693,132 @@ export async function toggleSave(
   return { ok: true, data: { saved, collectionId: targetId } };
 }
 
+// --- saved fonts ---------------------------------------------------------
+
+/**
+ * Save or unsave a font into a folder.
+ *
+ * Folders hold both projects and fonts, because that is how the two halves of
+ * the site meet: a mood board of work and the typefaces you would set it in
+ * belong in the same place, not in two parallel systems.
+ *
+ * The catalogue is a build-time JSON snapshot rather than a table, so the
+ * family name is stored alongside the slug — a save has to survive a family
+ * being renamed or dropped upstream.
+ */
+export async function toggleSavedFont(
+  fontSlug: string,
+  family: string,
+  collectionId?: string,
+): Promise<ActionResult> {
+  const user = await getOnboardedUser();
+  if (!user) return { ok: false, error: "Sign in to save fonts." };
+  if (!fontSlug || !family) return { ok: false, error: "Unknown font." };
+
+  try {
+    await enforceRateLimit("save", user.id);
+  } catch (error) {
+    return failure(error);
+  }
+
+  let targetId = collectionId;
+
+  if (!targetId) {
+    const first = await db.collection.findFirst({
+      where: { ownerId: user.id },
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+    targetId =
+      first?.id ??
+      (
+        await db.collection.create({
+          data: { name: "Saved", slug: "saved", ownerId: user.id },
+          select: { id: true },
+        })
+      ).id;
+  } else {
+    const owned = await db.collection.findUnique({
+      where: { id: targetId },
+      select: { ownerId: true },
+    });
+    if (!owned || owned.ownerId !== user.id) {
+      return { ok: false, error: "That folder is not yours." };
+    }
+  }
+
+  const existing = await db.savedFont.findUnique({
+    where: { collectionId_fontSlug: { collectionId: targetId, fontSlug } },
+    select: { id: true },
+  });
+
+  const saved = !existing;
+
+  await db.$transaction([
+    existing
+      ? db.savedFont.delete({ where: { id: existing.id } })
+      : db.savedFont.create({
+          data: { userId: user.id, collectionId: targetId, fontSlug, family },
+        }),
+    db.collection.update({
+      where: { id: targetId },
+      data: { fontCount: { increment: saved ? 1 : -1 } },
+    }),
+  ]);
+
+  revalidatePath(`/fonts/${fontSlug}`);
+  revalidatePath("/collections");
+  return { ok: true, data: { saved, collectionId: targetId } };
+}
+
+/** Create a folder and drop a font straight into it. */
+export async function createCollectionAndSaveFont(
+  fontSlug: string,
+  family: string,
+  name: string,
+  isPrivate = false,
+): Promise<ActionResult> {
+  const user = await getOnboardedUser();
+  if (!user) return { ok: false, error: "Sign in to save fonts." };
+
+  const parsed = collectionSchema.safeParse({ name, description: "", isPrivate });
+  if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error) };
+
+  try {
+    await enforceRateLimit("save", user.id);
+  } catch (error) {
+    return failure(error);
+  }
+
+  const base = slugify(parsed.data.name) || "collection";
+  let slug = base;
+  let attempt = 1;
+  while (
+    await db.collection.findUnique({
+      where: { ownerId_slug: { ownerId: user.id, slug } },
+      select: { id: true },
+    })
+  ) {
+    slug = `${base}-${++attempt}`;
+  }
+
+  const collection = await db.collection.create({
+    data: {
+      name: parsed.data.name,
+      slug,
+      isPrivate: parsed.data.isPrivate,
+      ownerId: user.id,
+      fontCount: 1,
+      fontSaves: { create: { userId: user.id, fontSlug, family } },
+    },
+    select: { id: true, name: true, isPrivate: true },
+  });
+
+  revalidatePath(`/fonts/${fontSlug}`);
+  revalidatePath("/collections");
+  return { ok: true, data: { collection } };
+}
+
 // --- follows -------------------------------------------------------------
 
 export async function toggleFollow(targetUserId: string): Promise<ActionResult> {

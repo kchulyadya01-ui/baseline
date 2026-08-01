@@ -7,6 +7,8 @@ import { ProjectGrid } from "@/components/community/project-card";
 import { Badge } from "@/components/ui/primitives";
 import { auth } from "@/lib/auth";
 import { getCollection } from "@/lib/community";
+import { fontsCssUrl, fontStack } from "@/lib/font-url";
+import { getFont } from "@/lib/fonts";
 import { isCommunityConfigured } from "@/lib/db";
 import { pluralise } from "@/lib/utils";
 
@@ -74,6 +76,9 @@ export default async function CollectionPage(props: {
               </Link>
               <span className="text-xs text-fg-subtle">
                 {pluralise(collection.saves.length, "project")}
+                {collection.fontSaves.length
+                  ? ` · ${pluralise(collection.fontSaves.length, "font")}`
+                  : ""}
               </span>
               {collection.isPrivate ? <Badge>Private</Badge> : null}
             </div>
@@ -81,13 +86,60 @@ export default async function CollectionPage(props: {
         </div>
       </header>
 
+      {collection.fontSaves.length ? (
+        <section className="border-b border-line py-8">
+          {/* One stylesheet for every font in the folder, not one per card. */}
+          <link
+            rel="stylesheet"
+            href={fontsCssUrl(collection.fontSaves.map((f) => f.family))}
+          />
+          <h2 className="label-mono mb-4">Fonts</h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {collection.fontSaves.map((saved) => {
+              const font = getFont(saved.fontSlug);
+              return (
+                <Link
+                  key={saved.id}
+                  href={`/fonts/${saved.fontSlug}`}
+                  className="rounded-card border border-line bg-bg-raised p-4 transition-colors hover:border-line-strong"
+                >
+                  <p
+                    className="specimen truncate text-2xl text-fg"
+                    style={{
+                      fontFamily: font
+                        ? fontStack(font)
+                        : `'${saved.family}', sans-serif`,
+                    }}
+                  >
+                    {saved.family}
+                  </p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="text-xs text-fg-muted">{saved.family}</span>
+                    {font ? (
+                      <Badge tone="success">{font.license.id}</Badge>
+                    ) : (
+                      <Badge tone="warning">No longer listed</Badge>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
       <div className="py-10">
         {collection.saves.length === 0 ? (
-          <p className="rounded-card border border-dashed border-line-strong px-6 py-14 text-center text-sm text-fg-muted">
-            Nothing saved here yet.
-          </p>
+          collection.fontSaves.length === 0 ? (
+            <p className="rounded-card border border-dashed border-line-strong px-6 py-14 text-center text-sm text-fg-muted">
+              Nothing saved here yet.
+            </p>
+          ) : null
         ) : (
-          <ProjectGrid projects={collection.saves.map((save) => save.project)} />
+          <>
+            <h2 className="label-mono mb-4">Projects</h2>
+            <ProjectGrid projects={collection.saves.map((save) => save.project)} />
+          </>
         )}
       </div>
     </div>

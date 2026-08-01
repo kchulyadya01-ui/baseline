@@ -1,8 +1,6 @@
 import Link from "next/link";
-import { Avatar } from "@/components/community/avatar";
+import { HeaderAccount } from "@/components/site/header-account";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { auth } from "@/lib/auth";
-import { unreadCount } from "@/lib/community";
 import { isCommunityConfigured } from "@/lib/db";
 
 const TOOLS = [
@@ -12,11 +10,17 @@ const TOOLS = [
   { href: "/identify", label: "Identify" },
 ];
 
-export async function SiteHeader() {
+/**
+ * Deliberately NOT async, and it does not call `auth()`.
+ *
+ * The header renders inside the root layout, so any server-side session read
+ * here opts the entire application into dynamic rendering — which silently
+ * cost static generation on the ~1,900 font pages that carry the site's SEO.
+ * `isCommunityConfigured()` only reads an env var, which is static-safe; the
+ * signed-in state is fetched by <HeaderAccount /> on the client.
+ */
+export function SiteHeader() {
   const communityOn = isCommunityConfigured();
-  const session = communityOn ? await auth() : null;
-  const user = session?.user ?? null;
-  const unread = user?.id && user.handle ? await unreadCount(user.id) : 0;
 
   const nav = communityOn
     ? [
@@ -53,48 +57,7 @@ export async function SiteHeader() {
         </nav>
 
         <div className="ml-auto flex items-center gap-1">
-          {communityOn && user ? (
-            <>
-              <Link
-                href="/messages"
-                aria-label={unread ? `Messages, ${unread} unread` : "Messages"}
-                className="relative rounded-control px-3 py-1.5 text-sm text-fg-muted transition-colors hover:bg-bg-sunken hover:text-fg"
-              >
-                Messages
-                {unread ? (
-                  <span className="absolute right-1.5 top-1 h-1.5 w-1.5 rounded-full bg-accent" />
-                ) : null}
-              </Link>
-              <Link
-                href={user.handle ? `/u/${user.handle}` : "/welcome"}
-                aria-label="Your profile"
-                className="ml-1 rounded-full transition-opacity hover:opacity-80"
-              >
-                <Avatar
-                  name={user.name}
-                  handle={user.handle}
-                  image={user.image}
-                  size="sm"
-                />
-              </Link>
-            </>
-          ) : communityOn ? (
-            <Link
-              href="/signin"
-              className="rounded-control px-3 py-1.5 text-sm text-fg-muted transition-colors hover:bg-bg-sunken hover:text-fg"
-            >
-              Sign in
-            </Link>
-          ) : (
-            <a
-              href="https://github.com/kchulyadya01-ui/baseline"
-              target="_blank"
-              rel="noreferrer"
-              className="hidden rounded-control px-3 py-1.5 text-sm text-fg-muted transition-colors hover:bg-bg-sunken hover:text-fg sm:block"
-            >
-              GitHub
-            </a>
-          )}
+          <HeaderAccount enabled={communityOn} />
           <ThemeToggle />
         </div>
       </div>

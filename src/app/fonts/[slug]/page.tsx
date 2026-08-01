@@ -5,7 +5,8 @@ import { FontCard } from "@/components/fonts/font-card";
 import { LicencePanel } from "@/components/fonts/licence-panel";
 import { Specimen } from "@/components/fonts/specimen";
 import { ButtonLink } from "@/components/ui/button";
-import { CodeBlock } from "@/components/ui/copy";
+import { DeveloperSnippets } from "@/components/fonts/developer-snippets";
+import { SaveFontButton } from "@/components/community/save-font-button";
 import { Badge, Card, Stat } from "@/components/ui/primitives";
 import {
   fontCssUrl,
@@ -146,6 +147,7 @@ export default async function FontPage(props: {
             >
               Use in a type scale
             </ButtonLink>
+            <SaveFontButton fontSlug={font.slug} family={font.family} />
             <a
               href={googleFontsPageUrl(font.family)}
               target="_blank"
@@ -162,14 +164,11 @@ export default async function FontPage(props: {
         <div className="min-w-0 space-y-8">
           <Specimen font={font} />
 
-          <section>
-            <h2 className="label-mono mb-4">Use it</h2>
-            <div className="space-y-4">
-              <CodeBlock code={linkSnippet} language="html" />
-              <CodeBlock code={importSnippet} language="css" />
-              <CodeBlock code={nextSnippet} language="next/font" />
-            </div>
-          </section>
+          <DeveloperSnippets
+            html={linkSnippet}
+            css={importSnippet}
+            next={nextSnippet}
+          />
         </div>
 
         <aside className="space-y-6">

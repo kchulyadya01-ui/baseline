@@ -410,6 +410,7 @@ export async function getCollections(ownerId: string, viewerId: string | null) {
       description: true,
       isPrivate: true,
       itemCount: true,
+      fontCount: true,
       updatedAt: true,
       saves: {
         select: {
@@ -424,6 +425,11 @@ export async function getCollections(ownerId: string, viewerId: string | null) {
             },
           },
         },
+        orderBy: { createdAt: "desc" },
+        take: 4,
+      },
+      fontSaves: {
+        select: { fontSlug: true, family: true },
         orderBy: { createdAt: "desc" },
         take: 4,
       },
@@ -443,6 +449,10 @@ export async function getCollection(
       owner: { select: { id: true, handle: true, name: true, image: true } },
       saves: {
         include: { project: { select: PROJECT_CARD_SELECT } },
+        orderBy: { createdAt: "desc" },
+      },
+      fontSaves: {
+        select: { id: true, fontSlug: true, family: true, note: true },
         orderBy: { createdAt: "desc" },
       },
     },

@@ -62,6 +62,7 @@ model User {
   saves         Save[]
   reposts       Repost[]
   creditedOn    ProjectCredit[]
+  savedFonts    SavedFont[]
   following     Follow[]              @relation("follower")
   followers     Follow[]              @relation("following")
   participantIn ConversationMember[]
@@ -639,14 +640,18 @@ model Collection {
   slug        String
   description String?  @db.VarChar(500)
   isPrivate   Boolean  @default(false)
+  /// Saved projects. Kept separate from fontCount so a folder can say
+  /// "8 projects · 3 fonts" without counting rows on every render.
   itemCount   Int      @default(0)
+  fontCount   Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   ownerId String
   owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
-  saves Save[]
+  saves     Save[]
+  fontSaves SavedFont[]
 
   @@unique([ownerId, slug])
   @@index([ownerId, updatedAt])
@@ -673,6 +678,31 @@ model Save {
   @@index([userId, createdAt])
   @@index([projectId])
   @@map("saves")
+}
+
+/// A font saved into a folder.
+///
+/// Stores the catalogue slug and the family name rather than a foreign key to
+/// Font: the font catalogue lives in a build-time JSON snapshot, not in this
+/// database, and a save must not break if a family is later renamed or dropped
+/// upstream. The family name is the fallback label when the slug no longer
+/// resolves.
+model SavedFont {
+  id        String   @id @default(cuid())
+  fontSlug  String
+  family    String
+  note      String?  @db.VarChar(500)
+  createdAt DateTime @default(now())
+
+  userId       String
+  collectionId String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@unique([collectionId, fontSlug])
+  @@index([userId, createdAt])
+  @@index([fontSlug])
+  @@map("saved_fonts")
 }
 
 // --- social graph --------------------------------------------------------

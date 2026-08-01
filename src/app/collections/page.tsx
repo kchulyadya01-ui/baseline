@@ -76,7 +76,18 @@ export default async function CollectionsPage() {
                   {collection.name}
                 </span>
                 <span className="shrink-0 text-2xs text-fg-subtle">
-                  {pluralise(collection.itemCount, "item")}
+                  {collection.itemCount + collection.fontCount === 0
+                    ? "empty"
+                    : [
+                        collection.itemCount
+                          ? pluralise(collection.itemCount, "project")
+                          : null,
+                        collection.fontCount
+                          ? pluralise(collection.fontCount, "font")
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
                 </span>
               </div>
 
