@@ -4,6 +4,7 @@ import { del } from "@vercel/blob";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth, getOnboardedUser, requireOnboarded } from "./auth";
+import { hasBlobStore } from "./blob";
 import { blockedUserIds } from "./community";
 import { db } from "./db";
 import { enforceRateLimit, RateLimitError } from "./rate-limit";
@@ -206,7 +207,7 @@ export async function deleteProject(projectId: string): Promise<ActionResult> {
 
   // Blobs first: a failed delete here leaves an orphan file, which is
   // recoverable. Deleting the row first would leave a file nothing points at.
-  if (process.env.BLOB_READ_WRITE_TOKEN && project.images.length) {
+  if (hasBlobStore() && project.images.length) {
     try {
       await del(project.images.map((i) => i.blobPath));
     } catch {

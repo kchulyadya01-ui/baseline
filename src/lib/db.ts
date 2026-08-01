@@ -56,7 +56,5 @@ export function isCommunityConfigured(): boolean {
   return Boolean(process.env.DATABASE_URL);
 }
 
-/** Uploads need the Blob store on top of the database. */
-export function isUploadConfigured(): boolean {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
-}
+// Blob configuration lives in src/lib/blob.ts — there is more than one way the
+// SDK authenticates, and it is not a database concern.

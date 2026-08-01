@@ -1,6 +1,7 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 import { getOnboardedUser } from "@/lib/auth";
+import { isBlobConfigured } from "@/lib/blob";
 import { checkRateLimit } from "@/lib/rate-limit";
 
 /**
@@ -33,7 +34,7 @@ const ALLOWED_CONTENT_TYPES = [
 const MAX_BYTES = 8 * 1024 * 1024; // 8 MB
 
 export async function POST(request: Request) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+  if (!isBlobConfigured()) {
     return NextResponse.json(
       { error: "Uploads are not configured on this deployment." },
       { status: 503 },
