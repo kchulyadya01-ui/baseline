@@ -8,6 +8,7 @@ const TOOLS = [
   { href: "/type-scale", label: "Type Scale" },
   { href: "/colour", label: "Colour" },
   { href: "/identify", label: "Identify" },
+  { href: "/assistant", label: "Assistant" },
 ];
 
 /**
