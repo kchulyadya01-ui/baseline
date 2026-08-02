@@ -31,7 +31,15 @@ https://baseline-wheat.vercel.app/api/auth/callback/google
 http://localhost:3000/api/auth/callback/google
 ```
 
-## 3. Rotate the Resend API key
+## 3. Gemini key is in chat history
+
+`GEMINI_API_KEY` was shared in plaintext during setup. Rotate at
+<https://aistudio.google.com/apikey> and update it on Vercel.
+
+Three AI surfaces have working API routes but no UI yet:
+`/api/ai/brief`, `/api/ai/search`, `/api/ai/project`.
+
+## 4. Rotate the Resend API key
 
 It was shared in plaintext during setup. Replace it at
 <https://resend.com/api-keys> and update `AUTH_RESEND_KEY` on Vercel.
