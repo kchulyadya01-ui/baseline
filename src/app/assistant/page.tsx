@@ -20,12 +20,13 @@ export default function AssistantPage() {
       <header className="pt-12 pb-8">
         <span className="label-mono">05 · Brief Assistant</span>
         <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight">
-          Start from the brief, not a blank page
+          Start from the brief, not the blank page
         </h1>
         <p className="mt-4 text-base text-fg-muted">
-          Describe the project in a sentence or two. You get a pairing drawn from
-          the {(1934).toLocaleString("en-GB")} open-licence families, a palette,
-          and a scale ratio — then the same checks the other tools run.
+          Describe the project in a sentence or two. Back comes a pairing drawn
+          from the {(1934).toLocaleString("en-GB")} open-licence families, a
+          palette, and a scale ratio — all of it put through the same checks the
+          other tools run, so nothing arrives untested.
         </p>
       </header>
 
@@ -49,15 +50,15 @@ export default function AssistantPage() {
         {[
           {
             title: "Only real fonts",
-            body: "Suggestions are resolved against the catalogue. A family that does not exist is dropped before you see it, never rendered as a link to nothing. Anything dropped is listed, so you can see what was discarded.",
+            body: "Every suggestion is checked against the catalogue first. Invent a font and it gets binned before it reaches you — and listed as binned, so you can see what it tried to get away with.",
           },
           {
             title: "The contrast is not a suggestion",
-            body: "Ask for warm and loud and a model will happily return ochre on red. Every pair is checked with the same WCAG maths the Colour Studio uses, and anything failing is moved along its own hue until it passes — before it reaches you.",
+            body: "Ask for warm and loud and any model will cheerfully hand you ochre on red. Every pair goes through the same WCAG maths the Colour Studio uses, and anything that fails gets nudged along its own hue until it passes, before you ever see it.",
           },
           {
             title: "A start, not an answer",
-            body: "The fonts are real and the ratios are arithmetic. The judgement about what suits a brief is the part worth arguing with, so take it into the studios and change it.",
+            body: "The fonts are real and the ratios are arithmetic. The taste is the part worth arguing with — so argue with it. Everything links straight into the studios so you can overrule it in about four seconds.",
           },
         ].map((item) => (
           <div key={item.title}>

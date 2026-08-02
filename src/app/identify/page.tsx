@@ -24,14 +24,15 @@ export default async function IdentifyPage(props: {
       <header className="pt-12 pb-8">
         <span className="label-mono">04 · Font Identification</span>
         <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight">
-          What is that site set in?
+          What on earth is that set in?
         </h1>
         <p className="mt-4 text-base text-fg-muted">
           Two ways in. Paste a URL and Baseline reads the page&rsquo;s own
-          stylesheets — exact, no guessing. Or give it an image, from a file or
-          your camera, and it reads the letterforms and pulls the colour palette
-          out of the pixels. Either way, every result carries its licence and
-          anything commercial comes with free alternatives you can ship.
+          stylesheets, which is as close to cheating as identification gets. Or
+          hand it an image — a file, or your camera pointed at a poster — and it
+          reads the letterforms and lifts the palette straight out of the pixels.
+          Every result carries its licence, and commercial faces arrive with free
+          lookalikes attached.
         </p>
       </header>
 
@@ -76,17 +77,17 @@ export default async function IdentifyPage(props: {
             {
               step: "01",
               title: "Google Fonts links — 95% confident",
-              body: "A stylesheet URL like fonts.googleapis.com/css2?family=Inter names the family outright, along with the weights the page loads. There is nothing to infer.",
+              body: "A stylesheet URL like fonts.googleapis.com/css2?family=Inter simply tells us the answer, along with the weights. No detective work required, which is our favourite kind.",
             },
             {
               step: "02",
               title: "@font-face rules — 88% confident",
-              body: "The page self-hosts and declares the family name in its own CSS. Near-certain, though a self-hosted file can be renamed.",
+              body: "The page self-hosts and names the family in its own CSS. Near-certain, unless someone renamed the file to Font-Final-FINAL-v3.woff2, in which case that is between them and their conscience.",
             },
             {
               step: "03",
               title: "Plain declarations — 35–70% confident",
-              body: "A font-family on html, body or :root describes the page's body text. Deeper in a stylesheet it may be for one component, or a fallback that never renders.",
+              body: "A font-family on html, body or :root is describing the page's actual text. Buried in a stylesheet it might be for one component nobody scrolls to, or a fallback that has never rendered in its life.",
             },
             {
               step: "04",

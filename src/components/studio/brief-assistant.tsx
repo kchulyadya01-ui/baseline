@@ -117,7 +117,7 @@ export function BriefAssistant() {
           onChange={(e) => setBrief(e.target.value)}
           rows={3}
           maxLength={1500}
-          placeholder="Describe the project. What is it, who is it for, how should it feel?"
+          placeholder="What is it, who is it for, and how should it feel? Be specific — vague in, vague out."
           className="w-full rounded-card border border-line-strong bg-bg-raised px-4 py-3 text-base text-fg placeholder:text-fg-subtle focus:border-accent focus:outline-none"
         />
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -126,7 +126,7 @@ export function BriefAssistant() {
             disabled={loading || brief.trim().length < 10}
             className="h-10 rounded-control bg-accent px-5 text-sm font-medium text-accent-fg transition-opacity hover:opacity-90 disabled:opacity-50"
           >
-            {loading ? "Thinking…" : "Suggest a direction"}
+            {loading ? "Having a think…" : "Suggest a direction"}
           </button>
           <span className="text-2xs text-fg-subtle">{brief.length}/1500</span>
         </div>
@@ -249,9 +249,9 @@ export function BriefAssistant() {
             <p className="mt-3 max-w-2xl text-sm text-fg-muted">{result.fontRationale}</p>
             {result.droppedFonts.length ? (
               <p className="mt-2 text-xs text-fg-subtle">
-                Suggested but not in the catalogue, so dropped:{" "}
-                {result.droppedFonts.join(", ")}. Only real open-licence families
-                are shown.
+                Suggested, then binned for not existing in the catalogue:{" "}
+                {result.droppedFonts.join(", ")}. Only real families make it
+                onto the page.
               </p>
             ) : null}
           </section>
@@ -299,8 +299,9 @@ export function BriefAssistant() {
               </tbody>
             </table>
             <p className="mt-2 text-2xs text-fg-subtle">
-              Checked with the same WCAG maths the Colour Studio uses. Anything that
-              failed was moved along its own hue until it passed, before you saw it.
+              Same WCAG maths the Colour Studio runs. Anything that failed was
+              already nudged along its own hue until it passed — you are seeing
+              the corrected version.
             </p>
           </section>
 
@@ -348,9 +349,8 @@ export function BriefAssistant() {
           </section>
 
           <p className={cn("text-xs text-fg-subtle")}>
-            The fonts and the maths are real — everything above is a catalogue family
-            and a checked contrast ratio. The judgement about what suits the brief is
-            a starting point, not an answer.
+            The fonts are real and the ratios are arithmetic. The taste is a
+            starting point — take it into the studios and disagree with it.
           </p>
         </div>
       ) : null}

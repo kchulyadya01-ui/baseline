@@ -84,12 +84,13 @@ export default async function CommunityPage(props: {
         <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="max-w-2xl font-display text-4xl font-semibold tracking-tight">
-              What people are making
+              What everyone else is making
             </h1>
             <p className="mt-4 max-w-2xl text-base text-fg-muted">
-              Post your work, save what you like into collections, and message
-              the person who made it. Every project lists the fonts and colours
-              behind it, so a feed post is a lead back into the tools.
+              Post your work, save what you like into folders, and message the
+               person who made it. Every project lists the fonts and colours
+               behind it — so unlike every other feed, you can find out how it
+               was actually done instead of just feeling bad about it.
             </p>
           </div>
           <ButtonLink href="/submit" size="lg">
@@ -162,12 +163,12 @@ function EmptyFeed({ sort, signedIn }: { sort: FeedSort; signedIn: boolean }) {
     return (
       <div className="rounded-card border border-dashed border-line-strong px-6 py-16 text-center">
         <p className="font-display text-lg font-medium">
-          {signedIn ? "You are not following anyone yet" : "Sign in to see this"}
+          {signedIn ? "You follow precisely nobody" : "Sign in to see this"}
         </p>
         <p className="mx-auto mt-2 max-w-md text-sm text-fg-muted">
           {signedIn
-            ? "Follow a few people and their work will collect here."
-            : "Following is per-account, so this view needs you signed in."}
+            ? "Follow a few people and their work turns up here. That is the deal."
+            : "Following is per-account, so this one needs you signed in."}
         </p>
         <ButtonLink
           href={signedIn ? "/community" : "/signin?next=/community"}
@@ -183,10 +184,11 @@ function EmptyFeed({ sort, signedIn }: { sort: FeedSort; signedIn: boolean }) {
 
   return (
     <div className="rounded-card border border-dashed border-line-strong px-6 py-16 text-center">
-      <p className="font-display text-lg font-medium">Nothing here yet</p>
+      <p className="font-display text-lg font-medium">Suspiciously empty</p>
       <p className="mx-auto mt-2 max-w-md text-sm text-fg-muted">
-        Be the first to post. A project needs one image and a title; the fonts
-        and colours are optional but they are what makes the feed useful.
+        Somebody has to go first. One image and a title is all it takes. The
+        fonts and colours are optional, but they are the entire reason anyone
+        will care.
       </p>
       <ButtonLink href="/submit" size="sm" className="mt-5">
         Post a project

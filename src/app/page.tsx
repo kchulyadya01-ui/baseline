@@ -9,25 +9,25 @@ const TOOLS = [
     index: "01",
     href: "/fonts",
     title: "Font Library",
-    body: "Every open-licence family, searchable by category, script, variable axes and licence — with the licence written in plain language, not legalese.",
+    body: "Every open-licence family, searchable by category, script, variable axes and licence. The licence is written in words a human uses, not the ones a lawyer bills for.",
   },
   {
     index: "02",
     href: "/type-scale",
     title: "Type Scale Studio",
-    body: "Base size and ratio in, a full scale out — with line height and tracking suggested per step, previewed in the font you actually chose.",
+    body: "Base size and ratio in, a whole scale out. Line height and tracking suggested per step, previewed in the font you actually picked rather than whatever the tool felt like.",
   },
   {
     index: "03",
     href: "/colour",
     title: "Colour Studio",
-    body: "OKLCH ramps that stay perceptually even across hues, with every text pair checked against WCAG 2.1 and a one-click fix for the ones that fail.",
+    body: "OKLCH ramps that stay evenly light across hues, because HSL has been lying to you for years. Every text pair checked against WCAG, and one click to fix the ones that fail.",
   },
   {
     index: "04",
     href: "/identify",
     title: "Font Identification",
-    body: "Paste a URL and read what a page is really set in, straight from its CSS. Commercial faces come back with free alternatives.",
+    body: "Paste a URL and read what a page is actually set in, straight from its CSS. Or point your camera at a poster. Commercial faces come back with free lookalikes.",
   },
 ];
 
@@ -45,7 +45,7 @@ const PERMISSIONS: [string, string, boolean][] = [
   ["Modify it", "New weights, tweaked glyphs, subset for performance.", true],
   [
     "Sell the font file itself",
-    "Under the OFL this is the one thing you may not do.",
+    "The one thing OFL says no to. Sell the poster, not the typeface.",
     false,
   ],
 ];
@@ -65,15 +65,15 @@ export default function Home() {
           </span>
 
           <h1 className="mt-5 max-w-4xl font-display text-4xl font-semibold leading-[1.03] tracking-tight sm:text-5xl">
-            The typography and colour decisions,
-            <span className="text-fg-subtle"> made once and exported.</span>
+            Stop picking fonts
+            <span className="text-fg-subtle"> like you&rsquo;re guessing.</span>
           </h1>
 
           <p className="mt-6 max-w-2xl text-lg leading-relaxed text-fg-muted">
-            Four tools for anyone who sets type — first project or fifteenth
-            year. Find a font and know exactly what you may do with it, build a
-            scale that holds together, and prove your palette is readable before
-            it ships.
+            Five tools for anyone who sets type, whether this is project one or
+            project four hundred. Find a font and know exactly what you&rsquo;re
+            allowed to do with it. Build a scale that isn&rsquo;t just vibes. Find
+            out your palette is unreadable now, rather than from a client.
           </p>
 
           <div className="mt-9 flex flex-wrap gap-3">
@@ -146,13 +146,13 @@ export default function Home() {
               Why licensing is a first-class citizen here
             </span>
             <h2 className="mt-3 max-w-md font-display text-2xl font-semibold tracking-tight">
-              &ldquo;Free for personal use&rdquo; is where projects go wrong
+              &ldquo;Free for personal use&rdquo; is how invoices happen
             </h2>
             <p className="mt-4 max-w-lg text-sm leading-relaxed text-fg-muted">
-              Every family here is OFL, Apache 2.0 or Ubuntu-licensed — free for
-              commercial work, with no per-seat maths and no invoice at the end
-              of the project. Baseline never indexes a commercial font file, and
-              every licence claim links back to the exact directory in{" "}
+              Every family here is OFL, Apache 2.0 or Ubuntu-licensed. Free for
+              commercial work, no per-seat arithmetic, no surprise bill three
+              months in. Baseline never indexes a commercial font file, and every
+              licence claim links straight back to the directory in{" "}
               <a
                 href={meta.source.repository}
                 target="_blank"
@@ -198,7 +198,7 @@ export default function Home() {
           <div className="flex items-baseline gap-3">
             <span className="label-mono">Most used</span>
             <span className="text-sm text-fg-subtle">
-              the faces everyone reaches for
+              the ones everybody reaches for first
             </span>
           </div>
           <Link href="/fonts" className="text-sm text-accent hover:underline">

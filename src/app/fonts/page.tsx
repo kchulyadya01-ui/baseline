@@ -60,7 +60,7 @@ export default async function FontsPage(props: {
       <header className="pt-12 pb-6">
         <span className="label-mono">01 · Font Library</span>
         <h1 className="mt-3 max-w-3xl font-display text-4xl font-semibold tracking-tight">
-          Every open-licence family, with the licence spelled out
+          Every open-licence family, with the small print in large type
         </h1>
         <p className="mt-4 max-w-2xl text-base text-fg-muted">
           {meta.count.toLocaleString("en-GB")} families from{" "}
@@ -72,8 +72,9 @@ export default async function FontsPage(props: {
           >
             google/fonts
           </a>
-          . Every one is free for commercial work — the differences are in what
-          you may do with the file itself. Synced {formatDate(meta.ingestedAt)}.
+          . All of them free for commercial work. The differences are in what
+          you can do with the file itself, which is where people usually come
+          unstuck. Synced {formatDate(meta.ingestedAt)}.
         </p>
       </header>
 
@@ -111,10 +112,10 @@ export default async function FontsPage(props: {
 function EmptyState() {
   return (
     <div className="rounded-card border border-dashed border-line-strong px-6 py-16 text-center">
-      <p className="font-display text-lg font-medium">No families match that</p>
+      <p className="font-display text-lg font-medium">Nothing matches that</p>
       <p className="mx-auto mt-2 max-w-md text-sm text-fg-muted">
-        Try a broader category, or drop the script filter — many display faces
-        only ship Latin.
+        You may have filtered your way into a corner. Try a broader category, or
+        drop the script filter — most display faces only ever shipped Latin.
       </p>
       <ButtonLink href="/fonts" variant="secondary" size="sm" className="mt-5">
         Reset filters

@@ -16,8 +16,8 @@ export function SiteFooter() {
             </span>
           </div>
           <p className="mt-3 max-w-xs text-sm text-fg-muted">
-            Typography and colour tools for designers at every level. Free, no
-            login, licence-checked.
+            Typography and colour tools for anyone who sets type. Free, no
+            login, and nothing here will invoice you later.
           </p>
         </div>
 
@@ -87,8 +87,8 @@ export function SiteFooter() {
       <div className="border-t border-line">
         <div className="mx-auto flex max-w-[76rem] flex-wrap items-center justify-between gap-3 px-5 py-5">
           <p className="text-xs text-fg-subtle">
-            Font metadata and licences from google/fonts. Baseline does not sell
-            or relicense any font.
+            Font metadata and licences from google/fonts. We index and link. We
+            do not sell fonts, and we would not know how.
           </p>
           <p className="label-mono">Phase 1 · the wedge</p>
         </div>

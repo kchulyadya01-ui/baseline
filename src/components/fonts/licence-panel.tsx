@@ -13,7 +13,7 @@ import type { FontLicense, FontProvenance } from "@/lib/types";
 const PERMISSIONS = [
   {
     key: "commercialUse",
-    yes: "Use it in commercial work — client projects, products, ads",
+    yes: "Use it commercially — client work, products, packaging, ads",
     no: "Personal use only",
   },
   {
@@ -23,7 +23,7 @@ const PERMISSIONS = [
   },
   {
     key: "modification",
-    yes: "Modify it — new weights, tweaked glyphs, subset it",
+    yes: "Modify it — new weights, tweaked glyphs, subset it down",
     no: "No modification",
   },
   {
@@ -86,10 +86,10 @@ export function LicencePanel({
 
       {license.id === "OFL-1.1" ? (
         <p className="mt-5 rounded-control bg-bg-sunken p-3 text-xs leading-relaxed text-fg-muted">
-          <strong className="text-fg">The catch people miss:</strong> if you
-          modify {family} and share the result, the modified font must also be
-          released under the OFL, and it cannot use the reserved font name.
-          Using it in a design — even a paid one — triggers none of that.
+          <strong className="text-fg">The bit everyone misses:</strong> modify{" "}
+          {family} and hand the result around and it has to go out under the OFL
+          too, under a different name. Simply using it in a design — however
+          well paid — triggers exactly none of that.
         </p>
       ) : null}
 
@@ -113,7 +113,7 @@ export function LicencePanel({
       </div>
 
       <p className="mt-3 text-2xs text-fg-subtle">
-        Plain-language summary, not legal advice. The linked licence governs.
+        Summary in plain words, not legal advice. The linked licence wins.
       </p>
     </section>
   );

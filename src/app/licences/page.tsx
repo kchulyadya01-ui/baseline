@@ -13,27 +13,27 @@ export const metadata: Metadata = {
 const FAQ = [
   {
     q: "Can I use an OFL font in paid client work?",
-    a: "Yes. The OFL places no restriction on what you set with the font — commercial, editorial, packaging, broadcast, all fine, with no additional licence and no per-seat counting.",
+    a: "Yes. Charge whatever you like. The OFL has no opinion on what you set with the font — commercial, editorial, packaging, broadcast — and no interest in how many designers touched it.",
   },
   {
     q: "Can I sell a logo I made with an OFL font?",
-    a: "Yes. The logo is your artwork; the font is a tool used to make it. What you cannot do is sell the font file itself, or bundle it as a product for sale.",
+    a: "Yes. The logo is your artwork; the font was the tool. Nobody asks the pencil for a cut. What you cannot do is sell the font file itself, or bundle it as a product.",
   },
   {
     q: "Do I have to credit the designer?",
-    a: "Not in your design. If you redistribute the font files — self-hosting them on your site counts — you must include the licence text alongside them. Baseline ships that text in every export.",
+    a: "Not in the design itself. But if you redistribute the files — and self-hosting them on your site absolutely counts — the licence text has to travel with them. Baseline puts it in every export so you do not have to remember.",
   },
   {
     q: "What is a Reserved Font Name?",
-    a: "Some OFL fonts reserve their name. You may modify the font, but the modified version must be released under a different name. This only applies when you distribute a modified font, not when you use it.",
+    a: "Some OFL fonts reserve their name, which means you can hack the outlines about all you like but the result cannot go out still calling itself the original. Only applies if you distribute the modified font. Using it changes nothing.",
   },
   {
     q: "Is Apache 2.0 different in practice?",
-    a: "Slightly more permissive: it carries no reserved-name rule, and no obligation to keep derivatives under the same licence. For everyday design work the two are interchangeable.",
+    a: "Marginally looser — no reserved-name rule, no obligation to keep derivatives under the same licence. For everyday design work you will never notice the difference.",
   },
   {
-    q: "What about the fonts on my computer?",
-    a: "Fonts bundled with macOS, Windows or Adobe apps are usually licensed for desktop use only. Embedding one in a website or app is a separate licence you probably do not have. Baseline's identifier flags these.",
+    q: "What about the fonts already on my computer?",
+    a: "This is the expensive one. Fonts bundled with macOS, Windows or Adobe are usually desktop-only. Embedding one in a website or app needs a licence you almost certainly do not have and did not know existed. The identifier flags these on sight.",
   },
 ];
 
@@ -49,12 +49,13 @@ export default function LicencesPage() {
       <header className="pt-12 pb-8">
         <span className="label-mono">Licensing</span>
         <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight">
-          The licence, in plain English
+          The licence, without the lawyer
         </h1>
         <p className="mt-4 text-base text-fg-muted">
-          Every one of the {meta.count.toLocaleString("en-GB")} families in
-          Baseline is free for commercial use. The differences between the three
-          licences are narrow, and only one of them catches people out.
+          All {meta.count.toLocaleString("en-GB")} families here are free for
+          commercial use. The three licences differ in ways so small you could
+          ignore them — except for exactly one clause, which catches everybody
+          out at least once.
         </p>
       </header>
 
@@ -93,7 +94,7 @@ export default function LicencesPage() {
 
       <section className="mt-14">
         <h2 className="font-display text-xl font-semibold tracking-tight">
-          Questions people actually ask
+          The questions people actually ask
         </h2>
         <dl className="mt-6 divide-y divide-line border-y border-line">
           {FAQ.map((item) => (
@@ -109,7 +110,7 @@ export default function LicencesPage() {
 
       <section className="mt-12 rounded-card border border-line bg-bg-sunken p-6">
         <h2 className="font-display text-base font-semibold">
-          How Baseline knows
+          How we know, rather than assume
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-fg-muted">
           Licence is taken from directory membership in{" "}
@@ -123,14 +124,14 @@ export default function LicencesPage() {
           </a>
           : a family under <code className="font-mono text-xs">ofl/</code> is OFL,
           under <code className="font-mono text-xs">apache/</code> is Apache 2.0.
-          There is no inference step, and every font page links to the exact
-          directory its claim came from. Commercial fonts are never indexed with
-          a file reference — the identifier can name one, but Baseline will not
-          serve it.
+          No inference, no vibes, no model asked politely for its opinion. Every
+          font page links to the exact directory the claim came from. Commercial
+          fonts are never indexed with a file reference — the identifier will
+          happily name one, but Baseline will not hand it to you.
         </p>
         <p className="mt-4 text-2xs text-fg-subtle">
-          This page is a plain-language summary and not legal advice. The linked
-          licence text governs.
+          Plain-language summary, not legal advice. If it ever comes to a
+          disagreement, the linked licence text is what counts, not us.
         </p>
         <Link
           href="/fonts"

@@ -183,7 +183,7 @@ export function ImageIdentify() {
           )}
         >
           <p className="text-sm text-fg-muted">
-            {loading ? "Reading the image…" : "Drop an image here, or"}
+            {loading ? "Squinting at the letterforms…" : "Drop an image here, or"}
           </p>
           <div className="mt-3 flex flex-wrap justify-center gap-2">
             <button
@@ -204,7 +204,7 @@ export function ImageIdentify() {
             </button>
           </div>
           <p className="mt-3 text-2xs text-fg-subtle">
-            PNG or JPEG · up to 8 MB · a photo of a poster, a book cover or a screen all work
+            PNG or JPEG · up to 8 MB · posters, book covers, shop signs, screens
           </p>
         </div>
       )}
@@ -308,8 +308,9 @@ export function ImageIdentify() {
                 ))}
               </ul>
               <p className="mt-2 text-2xs text-fg-subtle">
-                &ldquo;Shape agrees&rdquo; means the glyph index independently ranked the same
-                family. Without it, treat the name as a lead, not a finding.
+                &ldquo;Shape agrees&rdquo; means the glyph index ranked that family too. If it
+                does not say that, the AI is guessing and the geometry disagrees — believe
+                the geometry.
               </p>
             </section>
           ) : null}
@@ -346,8 +347,8 @@ export function ImageIdentify() {
 
             {result.matches.length === 0 ? (
               <p className="py-6 text-sm text-fg-muted">
-                No legible letterforms found — the palette above still applies. For type,
-                crop tighter to a single line of text on a plain background.
+                No letterforms it could read. The palette above is still good. For type,
+                crop tighter to one line of text on a plain background and try again.
               </p>
             ) : (
               <ul className="mt-3 space-y-2">
@@ -381,11 +382,12 @@ export function ImageIdentify() {
             )}
 
             <p className="mt-3 text-xs text-fg-subtle">
-              Shape matching is a shortlist, not an answer. If you have the web page, the{" "}
+              Shape matching gives you a shortlist worth checking, not a verdict. If you
+              have the actual page, the{" "}
               <Link href="/identify" className="text-accent hover:underline">
                 URL reader
               </Link>{" "}
-              is exact — it reads the page&rsquo;s own CSS.
+              simply reads the page&rsquo;s own CSS and tells you.
             </p>
           </section>
         </div>
