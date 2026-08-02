@@ -27,10 +27,11 @@ export default async function IdentifyPage(props: {
           What is that site set in?
         </h1>
         <p className="mt-4 text-base text-fg-muted">
-          Paste a URL. Baseline reads the page&rsquo;s own stylesheets and
-          reports the families it declares — no guessing from screenshots. Each
-          result carries its licence, and anything commercial comes with free
-          alternatives you can actually ship.
+          Two ways in. Paste a URL and Baseline reads the page&rsquo;s own
+          stylesheets — exact, no guessing. Or give it an image, from a file or
+          your camera, and it reads the letterforms and pulls the colour palette
+          out of the pixels. Either way, every result carries its licence and
+          anything commercial comes with free alternatives you can ship.
         </p>
       </header>
 
@@ -38,7 +39,7 @@ export default async function IdentifyPage(props: {
         {(
           [
             ["url", "From a URL"],
-            ["image", "From a screenshot"],
+            ["image", "From an image"],
           ] as const
         ).map(([key, label]) => (
           <Link
@@ -60,7 +61,7 @@ export default async function IdentifyPage(props: {
           <ImageIdentify />
         ) : (
           <p className="rounded-card border border-line bg-bg-sunken p-4 text-sm text-fg-muted">
-            Screenshot identification needs the glyph index, which lives in the
+            Image identification needs the glyph index, which lives in the
             database. URL identification works without one.
           </p>
         )
@@ -89,8 +90,8 @@ export default async function IdentifyPage(props: {
             },
             {
               step: "04",
-              title: "From a screenshot instead",
-              body: "If you only have an image, the screenshot reader segments the letterforms and matches their shapes against every family in the catalogue. It is a shortlist rather than an answer — shape matching is strong on structure and weak on fine detail — so use the URL reader whenever you have the page.",
+              title: "From an image instead",
+              body: "Give it a photo or a screenshot and it does two things. Type: the letterforms are segmented and matched by shape against every indexed family, and where an AI reading is available it names candidates which the shape index then confirms or contradicts. Colour: the palette is measured from the pixels directly, no model involved. Type is a shortlist; the palette is exact.",
             },
           ].map((item) => (
             <li key={item.step} className="flex gap-4">

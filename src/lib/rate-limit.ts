@@ -39,6 +39,13 @@ export const LIMITS = {
   repost: { limit: 60, windowSeconds: 3600 },
   report: { limit: 20, windowSeconds: 86400 },
   handleChange: { limit: 3, windowSeconds: 2592000 },
+  // AI calls cost money per request, so these are tighter than anything else.
+  // The brief assistant is the most expensive and the least likely to be
+  // needed in volume; search is cheap enough to be generous with.
+  aiBrief: { limit: 20, windowSeconds: 3600 },
+  aiSearch: { limit: 240, windowSeconds: 3600 },
+  aiProject: { limit: 40, windowSeconds: 3600 },
+  aiIdentify: { limit: 40, windowSeconds: 3600 },
 } as const satisfies Record<string, RateLimitRule>;
 
 export type LimitName = keyof typeof LIMITS;

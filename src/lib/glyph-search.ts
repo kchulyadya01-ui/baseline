@@ -97,6 +97,14 @@ function downscale(grey: Grey): Grey {
   return { data, width, height };
 }
 
+export interface Decoded {
+  grey: Grey;
+  /** Raw RGBA of the (possibly downscaled) image, for palette extraction. */
+  rgba: Uint8Array;
+  rgbaWidth: number;
+  rgbaHeight: number;
+}
+
 export function decodeImage(buffer: Buffer): Grey {
   const isPng =
     buffer.length > 8 &&
@@ -141,6 +149,24 @@ export interface ImageIdentifyResult {
   durationMs: number;
 }
 
+/** Raw RGBA for palette extraction, decoded independently of the glyph path. */
+export function decodeRgba(buffer: Buffer): { rgba: Uint8Array; width: number; height: number } {
+  const isPng =
+    buffer.length > 8 && buffer[0] === 0x89 && buffer[1] === 0x50 &&
+    buffer[2] === 0x4e && buffer[3] === 0x47;
+  const isJpeg = buffer.length > 3 && buffer[0] === 0xff && buffer[1] === 0xd8;
+
+  if (isPng) {
+    const png = PNG.sync.read(buffer);
+    return { rgba: new Uint8Array(png.data), width: png.width, height: png.height };
+  }
+  if (isJpeg) {
+    const jpeg = decodeJpeg(buffer, { useTArray: true });
+    return { rgba: new Uint8Array(jpeg.data), width: jpeg.width, height: jpeg.height };
+  }
+  throw new ImageIdentifyError("Only PNG and JPEG images can be read.", 415);
+}
+
 interface IndexRow {
   fontSlug: string;
   family: string;
@@ -168,12 +194,16 @@ export async function identifyFromImage(
     plausibleLetters(blobs, grey.width, grey.height),
   ).slice(0, MAX_LETTERS);
 
+  // An image with no legible type is still worth something — the palette comes
+  // out of it either way — so this returns empty matches rather than throwing.
   if (letters.length < 2) {
-    throw new ImageIdentifyError(
-      "No readable letterforms found. Crop tighter to a single line of text, " +
-        "on a plain background, and make sure the letters are reasonably large.",
-      422,
-    );
+    return {
+      lettersFound: letters.length,
+      imageWidth: grey.width,
+      imageHeight: grey.height,
+      matches: [],
+      durationMs: Date.now() - started,
+    };
   }
 
   const cells = letters.map((blob) =>
