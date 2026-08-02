@@ -48,7 +48,7 @@ export default async function IdentifyPage(props: {
             href={key === "url" ? "/identify" : "/identify?mode=image"}
             className={
               mode === key
-                ? "rounded-control bg-bg-inset px-3 py-1.5 text-sm font-medium text-fg"
+                ? "rounded-control bg-accent-soft px-3 py-1.5 text-sm font-medium text-accent"
                 : "rounded-control px-3 py-1.5 text-sm text-fg-muted hover:bg-bg-sunken hover:text-fg"
             }
           >

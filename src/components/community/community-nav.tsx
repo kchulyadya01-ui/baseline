@@ -25,7 +25,7 @@ export function CommunityNav({ active }: { active: "feed" | "people" | "collecti
           className={cn(
             "rounded-control px-3 py-1.5 text-sm transition-colors",
             active === section.match
-              ? "bg-bg-inset font-medium text-fg"
+              ? "bg-accent-soft font-medium text-accent"
               : "text-fg-muted hover:bg-bg-sunken hover:text-fg",
           )}
         >

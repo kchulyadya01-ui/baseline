@@ -101,7 +101,7 @@ export default async function SharedPage(props: {
             className={cn(
               "rounded-control px-3 py-1.5 text-sm transition-colors",
               tab === key
-                ? "bg-bg-inset font-medium text-fg"
+                ? "bg-accent-soft font-medium text-accent"
                 : "text-fg-muted hover:bg-bg-sunken hover:text-fg",
             )}
           >
