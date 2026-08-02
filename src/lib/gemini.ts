@@ -22,11 +22,17 @@ import "server-only";
 const ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
 
 /**
- * Flash rather than Pro throughout. Every task here is grounded — naming a
- * typeface from a picture, turning a phrase into filters — and none of them
- * reward slow deliberation. Latency is the feature.
+ * Flash-lite rather than Pro throughout. Every task here is grounded — naming a
+ * typeface from a picture, turning a phrase into filters — and the glyph index
+ * independently verifies anything that matters, so latency is worth more than
+ * deliberation. Measured on vision: ~3s here against ~12s for full Flash.
+ *
+ * An ALIAS, not a pinned version. `gemini-2.5-flash` was hardcoded first and
+ * returned 404 "no longer available to new users" on a freshly issued key —
+ * a pinned model is a time bomb. Override with GEMINI_MODEL if a specific
+ * version is ever needed.
  */
-const TEXT_MODEL = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
+const TEXT_MODEL = process.env.GEMINI_MODEL ?? "gemini-flash-lite-latest";
 
 export function isGeminiConfigured(): boolean {
   return Boolean(process.env.GEMINI_API_KEY);
