@@ -41,6 +41,14 @@ export interface FontRecord {
   lastModified: string;
   sizeBytes: number;
   isNoto: boolean;
+  /**
+   * Structural metrics measured from the family's own outlines by
+   * scripts/index-glyphs.ts and merged in by scripts/enrich-catalogue.ts.
+   * Absent for any family that failed to index.
+   */
+  widthRatio?: number;
+  strokeContrast?: number;
+  strokeWeight?: number;
   license: FontLicense;
   provenance: FontProvenance;
 }
@@ -68,6 +76,10 @@ export interface FontQuery {
   variable?: boolean;
   italic?: boolean;
   license?: FontLicense["id"] | "all";
+  /** Structural filters, from the enriched metrics. */
+  maxWidthRatio?: number;
+  minWidthRatio?: number;
+  contrast?: "high" | "low";
   sort?: SortKey;
   page?: number;
   perPage?: number;

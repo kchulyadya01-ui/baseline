@@ -9,7 +9,9 @@ import {
   queryFonts,
   subsetOptions,
 } from "@/lib/fonts";
+import { AiSearch } from "@/components/fonts/ai-search";
 import { fontsCssUrl } from "@/lib/font-url";
+import { isGeminiConfigured } from "@/lib/gemini";
 import type { FontCategory, SortKey } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 
@@ -41,6 +43,9 @@ export default async function FontsPage(props: {
     variable: Boolean(single("variable")),
     italic: Boolean(single("italic")),
     license: (single("license") as "OFL-1.1") ?? "all",
+    maxWidthRatio: single("maxWidth") ? Number(single("maxWidth")) : undefined,
+    minWidthRatio: single("minWidth") ? Number(single("minWidth")) : undefined,
+    contrast: single("contrast") as "high" | "low" | undefined,
     sort: (single("sort") as SortKey) ?? "popular",
     page: Number(single("page") ?? 1),
     perPage: DEFAULT_PER_PAGE,
@@ -77,6 +82,8 @@ export default async function FontsPage(props: {
           unstuck. Synced {formatDate(meta.ingestedAt)}.
         </p>
       </header>
+
+      <AiSearch enabled={isGeminiConfigured()} />
 
       <FilterBar subsets={subsetOptions()} total={meta.count} />
 

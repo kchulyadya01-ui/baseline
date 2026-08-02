@@ -127,6 +127,9 @@ export function queryFonts(query: FontQuery = {}): FontQueryResult {
     variable,
     italic,
     license = "all",
+    maxWidthRatio,
+    minWidthRatio,
+    contrast,
     sort = "popular",
     page = 1,
     perPage = DEFAULT_PER_PAGE,
@@ -140,6 +143,23 @@ export function queryFonts(query: FontQuery = {}): FontQueryResult {
     if (variable && !font.isVariable) return false;
     if (italic && !font.hasItalic) return false;
     if (license !== "all" && font.license.id !== license) return false;
+
+    // Structural filters. A family with no measured metrics is excluded rather
+    // than assumed to match — "show me condensed faces" should not quietly
+    // include the one family that failed to index.
+    if (maxWidthRatio !== undefined) {
+      if (font.widthRatio === undefined || font.widthRatio > maxWidthRatio) return false;
+    }
+    if (minWidthRatio !== undefined) {
+      if (font.widthRatio === undefined || font.widthRatio < minWidthRatio) return false;
+    }
+    if (contrast === "high") {
+      if (font.strokeContrast === undefined || font.strokeContrast < 2.2) return false;
+    }
+    if (contrast === "low") {
+      if (font.strokeContrast === undefined || font.strokeContrast > 1.45) return false;
+    }
+
     if (needle && !matches(font, needle)) return false;
     return true;
   });

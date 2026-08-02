@@ -8,7 +8,6 @@ import {
   GLYPH_DIMS,
   KEY_GLYPHS,
   normalise,
-  toVectorLiteral,
 } from "./glyph-descriptor";
 import {
   binarise,
@@ -95,14 +94,6 @@ function downscale(grey: Grey): Grey {
   }
 
   return { data, width, height };
-}
-
-export interface Decoded {
-  grey: Grey;
-  /** Raw RGBA of the (possibly downscaled) image, for palette extraction. */
-  rgba: Uint8Array;
-  rgbaWidth: number;
-  rgbaHeight: number;
 }
 
 export function decodeImage(buffer: Buffer): Grey {
@@ -276,5 +267,3 @@ export async function glyphIndexSize(): Promise<number> {
   );
   return Number(rows[0]?.count ?? 0);
 }
-
-export { toVectorLiteral };

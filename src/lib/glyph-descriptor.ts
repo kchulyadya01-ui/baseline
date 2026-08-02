@@ -36,11 +36,6 @@ export interface GlyphMetrics {
   hasSerifs: boolean;
 }
 
-export interface Descriptor {
-  vector: number[];
-  metrics: GlyphMetrics;
-}
-
 // --- rasterisation -------------------------------------------------------
 
 export interface PathCommand {
@@ -248,37 +243,56 @@ export function toVectorLiteral(vector: number[]): string {
 }
 
 /**
- * Stroke weight and contrast from a rasterised glyph.
+ * Stroke weight and contrast from a rasterised 'o'.
  *
- * Weight is the mean run length of filled pixels across the rows that have any
- * ink; contrast is the spread between the thickest and thinnest runs, which is
- * what separates a Didone from a grotesque.
+ * CONTRAST is the ratio of vertical stem thickness to horizontal bar
+ * thickness. On an 'o' the stems are what a horizontal scan through the middle
+ * crosses, and the bars are what a vertical scan through the middle crosses.
+ * A Didone has thick stems and hairline bars, so the ratio is high; a
+ * monolinear grotesque is close to 1.
+ *
+ * An earlier version measured the spread between the longest and shortest
+ * horizontal runs anywhere in the glyph. That describes the shape of the bowl,
+ * not the modulation of the stroke, and it ranked Poppins and Lato — two of the
+ * most evenly weighted faces in the catalogue — as high contrast. Measure the
+ * thing you actually mean.
  */
 export function strokeStats(grid: number[], size = CELL) {
-  const runs: number[] = [];
+  const ink = (row: number, col: number) => grid[row * size + col] > 0.45;
 
-  for (let row = 0; row < size; row += 1) {
-    let run = 0;
-    for (let col = 0; col < size; col += 1) {
-      if (grid[row * size + col] > 0.5) {
-        run += 1;
-      } else if (run > 0) {
-        runs.push(run);
-        run = 0;
-      }
-    }
-    if (run > 0) runs.push(run);
+  // Horizontal scan through the vertical middle: crosses both stems.
+  const midRow = Math.floor(size / 2);
+  const stemRuns: number[] = [];
+  let run = 0;
+  for (let col = 0; col < size; col += 1) {
+    if (ink(midRow, col)) run += 1;
+    else if (run > 0) { stemRuns.push(run); run = 0; }
   }
+  if (run > 0) stemRuns.push(run);
 
-  if (runs.length === 0) return { weight: 0, contrast: 0 };
+  // Vertical scan through the horizontal middle: crosses both bars.
+  const midCol = Math.floor(size / 2);
+  const barRuns: number[] = [];
+  run = 0;
+  for (let row = 0; row < size; row += 1) {
+    if (ink(row, midCol)) run += 1;
+    else if (run > 0) { barRuns.push(run); run = 0; }
+  }
+  if (run > 0) barRuns.push(run);
 
-  const sorted = [...runs].sort((a, b) => a - b);
-  const thin = sorted[Math.floor(sorted.length * 0.15)] || 1;
-  const thick = sorted[Math.floor(sorted.length * 0.85)] || 1;
+  const mean = (values: number[]) =>
+    values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+
+  const stem = mean(stemRuns);
+  const bar = mean(barRuns);
+
+  // A glyph the scans could not read (missing, or a solid block) gets 1 —
+  // "no measurable modulation" — rather than a wild ratio from a zero.
+  const contrast = stem > 0 && bar > 0 ? Math.max(stem, bar) / Math.min(stem, bar) : 1;
 
   return {
-    weight: runs.reduce((a, b) => a + b, 0) / runs.length / size,
-    contrast: thick / Math.max(1, thin),
+    weight: stem > 0 ? stem / size : 0,
+    contrast: Number(contrast.toFixed(3)),
   };
 }
 

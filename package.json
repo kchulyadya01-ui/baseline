@@ -10,7 +10,8 @@
     "ingest": "tsx scripts/ingest-fonts.ts",
     "smoke": "tsx scripts/smoke-community.ts",
     "postinstall": "prisma generate",
-    "index-glyphs": "tsx scripts/index-glyphs.ts"
+    "index-glyphs": "tsx scripts/index-glyphs.ts",
+    "enrich": "tsx scripts/enrich-catalogue.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",
