@@ -9,6 +9,7 @@ const TOOLS: NavItem[] = [
   { href: "/type-scale", label: "Type Scale" },
   { href: "/colour", label: "Colour" },
   { href: "/identify", label: "Identify" },
+  { href: "/mockups", label: "Mockups" },
   { href: "/assistant", label: "Assistant" },
 ];
 
